@@ -8,7 +8,7 @@ import argparse
 from pathlib import Path
 from typing import Dict, Tuple
 from tqdm import tqdm
-from sqlmodel import Session, select, delete, text
+from sqlmodel import Session, select, text
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -100,29 +100,54 @@ def load_uuid_map() -> Dict[Tuple[str, str], str]:
     
     if not SECRET_CSV_PATH.exists():
         logger.error(f"⚠️  ATTENTION : Fichier de correspondance introuvable : {SECRET_CSV_PATH}")
-        logger.error("👉 Les UUIDs seront générés aléatoirement (pas de suivi longitudinal possible).")
         return mapping
 
-    logger.info(f"🔑 Chargement de la table de correspondance : {SECRET_CSV_PATH}")
+    logger.info(f"🔑 Chargement de la table de correspondance : {SECRET_CSV_PATH.name}")
+
+    encodings = ['utf-8-sig', 'cp1252', 'latin-1', 'utf-8']
     
-    try:
-        with open(SECRET_CSV_PATH, mode="r", encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f, delimiter=";") 
-            
-            for row in reader:
-                raw_nom = row.get("Nom") or row.get("nom")
-                raw_prenom = row.get("Prenom") or row.get("prenom") or row.get("Prénom")
-                uuid_val = row.get("UUID4") or row.get("uuid4")
+    for encoding in encodings:
+        try:
+            with open(SECRET_CSV_PATH, mode="r", encoding=encoding) as f:
+                reader = csv.DictReader(f, delimiter=";") 
 
-                if raw_nom and raw_prenom and uuid_val:
-                    key = (raw_nom.strip().lower(), raw_prenom.strip().lower())
-                    mapping[key] = uuid_val
-                    
-        logger.info(f"✅ {len(mapping)} identités chargées en mémoire.")
-        return mapping
-    except Exception as e:
-        logger.error(f"❌ Erreur lors du chargement du fichier de correspondance : {e}")
-        return {}
+                if not reader.fieldnames:
+                    logger.error(f"❌ Le fichier de correspondance est vide ou mal formaté avec l'encodage {encoding}.")
+                    return mapping
+                
+                headers = [h.lower() for h in reader.fieldnames]
+                required = ["nom", "prenom", "uuid"]
+
+                if not any('nom' in h for h in headers):
+                    logger.warning(f"⚠️ Colonnes suspectes avec {encoding} : {reader.fieldnames}.")
+                    continue
+                
+                count = 0
+                for row in reader:
+                    clean_row = {k.strip().lower(): v.strip() for k, v in row.items() if k}
+                    nom = clean_row.get("nom")
+                    prenom = clean_row.get("prenom") or clean_row.get("prénom")
+                    uuid_val = clean_row.get("uuid") or clean_row.get("uuid4")
+
+                    if nom and prenom and uuid_val:
+                        key = (nom.lower(), prenom.lower())
+                        mapping[key] = uuid_val
+                        count += 1
+
+                if count > 0:
+                    logger.info(f"✅ SUCCÈS : {count} identités chargées avec l'encodage '{encoding}'.")
+                    return mapping
+                else:
+                    logger.warning(f"⚠️ Fichier lu avec {encoding} mais aucune donnée valide trouvée.")
+
+        except UnicodeDecodeError:
+            logger.warning(f"⚠️ Échec de la lecture avec l'encodage {encoding}, tentative suivante...")
+            continue
+        except Exception as e:
+            logger.error(f"❌ Erreur lors du chargement du fichier de correspondance : {e}")
+            return {}
+    logger.error("❌ Échec de la lecture du fichier de correspondance avec tous les encodages.")
+    return mapping
 
 def seed_students(session: Session, uuid_map: Dict):
     """Lit l'enquête et importe les étudiants en utilisant l'UUID map."""
@@ -252,7 +277,6 @@ def seed_dictation_files(session: Session, uuid_map: Dict):
         if filename == TEACHER_FILENAME:
             continue
 
-        # REGEX ???
         match = FILENAME_PATTERN.match(filename)
 
         if not match:

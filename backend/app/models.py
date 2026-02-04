@@ -135,4 +135,4 @@ class Mistake(SQLModel, table=True):
     context: str
     malus: float
 
-    submission: Submission = Relationship(back_populates="mistake")
+    submission: Submission = Relationship(back_populates="mistakes")
