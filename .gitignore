@@ -1,0 +1,20 @@
+# .gitignore
+
+# Sécurité.
+.env
+.env.local
+
+# Python & Environnement virtuel.
+venv/
+__pycache__/
+*.pyc
+
+# Données locales (RGPD).
+*.csv
+*.xlsx
+*.sqlite
+*.db
+
+# IDE settings.
+.vscode/
+.idea/
