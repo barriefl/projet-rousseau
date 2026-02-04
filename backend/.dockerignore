@@ -1,0 +1,28 @@
+# Fichier: backend/.dockerignore
+
+# Ignorer le dossier git.
+.git
+.gitignore
+
+# Ignorer l'environnement virtuel local.
+venv/
+env/
+
+# Ignorer les fichiers Python compilés et caches.
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Ignorer les variables d'environnement locales.
+.env
+.env.local
+
+# Ignorer les tests et la couverture de code.
+.pytest_cache
+.coverage
+htmlcov/
+tests/
