@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 from sqlmodel import JSON, Column, SQLModel, Field, Relationship
 from enum import Enum
@@ -31,6 +31,14 @@ class ReadingSupport(str, Enum):
 class Library(str, Enum):
     YES = "Oui"
     NO = "Non"
+
+class Platform(str, Enum):
+    VOLTAIRE = "Voltaire"
+    ECRIPLUS = "Ecri+"
+
+class AssessmentType(str, Enum):
+    INITIAL = "Initiale"
+    FINAL = "Finale"
 
 class TimestampMixin(SQLModel):
     created_at: datetime = Field(
@@ -72,6 +80,10 @@ class Student(TimestampMixin, table=True):
     declared_level: Optional[str] = Field(default=None, description="Niveau déclaré par l'étudiant.")
 
     submissions: list["Submission"] = Relationship(
+        back_populates="student",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    assessments: List["AssessmentResult"] = Relationship(
         back_populates="student",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
@@ -136,3 +148,18 @@ class Mistake(SQLModel, table=True):
     malus: float
 
     submission: Submission = Relationship(back_populates="mistakes")
+
+class AssessmentResult(SQLModel, table=True):
+    __tablename__ = "assessment_results"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    student_id: int = Field(foreign_key="students.id")
+
+    platform: Platform
+    type: AssessmentType
+
+    score: float = Field(default=0.0)
+
+    details: Dict[str, Any] = Field(default={}, sa_column=Column(JSON))
+
+    student: "Student" = Relationship(back_populates="assessments")
