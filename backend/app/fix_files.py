@@ -3,7 +3,6 @@ import os
 import difflib
 from pathlib import Path
 
-# Configuration
 BASE_DIR = Path(__file__).parent.parent.parent
 DATA_DIR = Path(os.getenv("DATA_DIR", BASE_DIR / "data"))
 CSV_PATH = DATA_DIR / "SECRET_correspondance.csv"
@@ -12,6 +11,27 @@ DICTATES_DIR = DATA_DIR / "dictates"
 def normalize(text):
     """Nettoie le texte pour la comparaison."""
     return text.strip().lower().replace("-", " ").replace("_", " ")
+
+def clean_filename_part(text, is_surname=False):
+    """
+    Formate proprement une partie du nom pour le fichier :
+    - Remplace les espaces par des tirets
+    - Supprime les doubles tirets
+    - Met en MAJUSCULE si c'est le nom de famille
+    """
+    if not text: return ""
+    
+    if is_surname:
+        text = text.upper()
+    else:
+        text = text.strip() 
+
+    text = text.replace(" ", "-")
+    
+    while "--" in text:
+        text = text.replace("--", "-")
+        
+    return text.strip("-")
 
 def main():
     print(f"🔧 Correction automatique des fichiers dictées...\n")
@@ -23,7 +43,8 @@ def main():
         try:
             with open(CSV_PATH, 'r', encoding=encoding) as f:
                 reader = csv.DictReader(f, delimiter=';')
-                if not reader.fieldnames: continue
+                if not reader.fieldnames: 
+                    continue
                 
                 for row in reader:
                     clean_row = {k.strip().lower(): v.strip() for k, v in row.items() if k}
@@ -36,8 +57,10 @@ def main():
                             'prenom': prenom,
                             'compare_key': f"{normalize(nom)} {normalize(prenom)}"
                         })
-                if csv_db: break
-        except: continue
+                if csv_db: 
+                    break
+        except: 
+            continue
     
     if not csv_db:
         print("❌ Impossible de lire le CSV Correspondance.")
@@ -48,11 +71,13 @@ def main():
     renamed_count = 0
     csv_keys = [x['compare_key'] for x in csv_db]
     
-    for file_path in DICTATES_DIR.glob("*.txt"):
-        if "GRAZIANO" in file_path.name: continue
+    for file_path in DICTATES_DIR.rglob("*.txt"):
+        if "GRAZIANO" in file_path.name: 
+            continue
         
         parts = file_path.stem.split('_')
-        if len(parts) < 2: continue
+        if len(parts) < 2: 
+            continue
         
         current_nom = parts[0]
         current_prenom = parts[1]
@@ -68,14 +93,21 @@ def main():
         if matches:
             match_key = matches[0]
             target_data = next(x for x in csv_db if x['compare_key'] == match_key)
+
+            new_nom = clean_filename_part(target_data['nom'], is_surname=True)
+            new_prenom = clean_filename_part(target_data['prenom'], is_surname=False)
             
-            target_nom = target_data['nom']
-            target_prenom = target_data['prenom']
+            new_filename = f"{new_nom}_{new_prenom}{suffix}.txt"
+
+            if file_path.name == new_filename:
+                continue
+
+            new_path = file_path.parent / new_filename
             
-            new_filename = f"{target_nom}_{target_prenom}{suffix}.txt"
-            new_path = DICTATES_DIR / new_filename
+            relative_old = f"{file_path.parent.name}/{file_path.name}"
+            relative_new = f"{file_path.parent.name}/{new_filename}"
             
-            print(f"🔄 Renommage : {file_path.name:<35} -> {new_filename}")
+            print(f"🔄 Renommage : {relative_old:<45} -> {relative_new}")
             
             try:
                 os.rename(file_path, new_path)
@@ -83,7 +115,7 @@ def main():
             except Exception as e:
                 print(f"   ❌ Erreur : {e}")
         else:
-            print(f"⚠️  Pas de correspondance trouvée pour : {file_path.name} (Ajoutez-le au CSV !)")
+            print(f"⚠️  Pas de correspondance trouvée pour : {file_path.parent.name}/{file_path.name}.")
 
     print(f"\n🎉 Terminé ! {renamed_count} fichiers corrigés.")
 

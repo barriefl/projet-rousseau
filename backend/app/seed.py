@@ -30,10 +30,17 @@ logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).parent.parent.parent
 DATA_DIR = Path(os.getenv("DATA_DIR", BASE_DIR / "data"))
 
+DICTATES_DIR = DATA_DIR / "dictates"
 SURVEY_CSV_PATH = DATA_DIR / "Enquête des antécédants 2024+2026.csv"
 SECRET_CSV_PATH = DATA_DIR / "SECRET_correspondance.csv"
-DICTATES_DIR = DATA_DIR / "dictates"
 TEACHER_FILENAME = "GRAZIANO_Emmanuelle_graziaem.txt"
+
+WAVES = [
+    { "folder": "data-initial", "suffix": "Initiale" },
+    { "folder": "data-final", "suffix": "Finale" }
+]
+
+DICTATION_BASE_TITLE = "Dictées Étude Rousseau"
 
 CSV_COLS = {
     "nom": "15. nom",
@@ -53,7 +60,16 @@ CSV_COLS = {
 
 FILENAME_PATTERN = re.compile(r'^(?P<nom>[^_]+)_(?P<prenom>[^_]+)(?:_.*)?\.txt$')
 
-DICTATION_TITLE = "Dictées Étude Rousseau"
+def print_diagnostic():
+    logger.info(f"🔍 Diagnostic de l'environnement de données :")
+    logger.info(f"   -> DATA_DIR = {DATA_DIR} ({'✅ Présent' if DATA_DIR.exists() else '❌ Absent'})")
+    logger.info(f"   -> DICTATES_DIR = {DICTATES_DIR} ({'✅ Présent' if DICTATES_DIR.exists() else '❌ Absent'})")
+
+    if DICTATES_DIR.exists():
+        files = list(DICTATES_DIR.iterdir())
+        logger.info(f"   -> Contenu de DICTATES_DIR : {[f.name for f in files]}")
+    else:
+        logger.error("   ❌ Le dossier 'dictates' est introuvable dans /data !")
 
 def read_file_safely(file_path: Path) -> str:
     """Lit un fichier en essayant différentes encodages."""
@@ -144,8 +160,9 @@ def load_uuid_map() -> Dict[Tuple[str, str], str]:
             logger.warning(f"⚠️ Échec de la lecture avec l'encodage {encoding}, tentative suivante...")
             continue
         except Exception as e:
-            logger.error(f"❌ Erreur lors du chargement du fichier de correspondance : {e}")
+            logger.error(f"❌ Erreur inattendue lors de la lecture du fichier de correspondance avec {encoding} : {e}")
             return {}
+        
     logger.error("❌ Échec de la lecture du fichier de correspondance avec tous les encodages.")
     return mapping
 
@@ -233,7 +250,6 @@ def seed_dictation_files(session: Session, uuid_map: Dict):
 
     logger.info(f"Traitement des dictées dans : {DICTATES_DIR}")
 
-    # Traitement de la dictée enseignant.
     teacher_path = DICTATES_DIR / TEACHER_FILENAME
     if not teacher_path.exists():
         logger.error(f"❌ Erreur critique : Le fichier enseignant {TEACHER_FILENAME} est absent !")
@@ -241,91 +257,99 @@ def seed_dictation_files(session: Session, uuid_map: Dict):
     
     content_ref = read_file_safely(teacher_path)
 
-    dictation_title = DICTATION_TITLE
-    dictation = session.exec(select(Dictation).where(Dictation.title == dictation_title)).first()
-    
-    if not dictation:
-        dictation = Dictation(
-            title=dictation_title,
-            content_reference=content_ref,
-            rules_config={"DEFAULT": 1.0}
-        )
-        session.add(dictation)
-        session.flush()
-        session.refresh(dictation)
-        logger.info(f"✅ Dictée de référence créée (ID: {dictation.id})")
-    else:
-        logger.info(f"ℹ️ La dictée existe déjà (ID: {dictation.id}).")
-
-    # Traitement des dictées étudiants.
-    logger.info("📂 Importation des copies étudiantes...")
     all_students = session.exec(select(Student)).all()
     student_lookup = {s.anonymous_id: s.id for s in all_students}
 
-    existing_submissions = {
-        (sub.student_id, sub.dictation_id) 
-        for sub in session.exec(select(Submission).where(Submission.dictation_id == dictation.id)).all()
-    }
+    total_added = 0
 
-    txt_files = list(DICTATES_DIR.glob("*.txt"))
-    added_count = 0
-    missing_count = 0
+    for wave in WAVES:
+        folder_name = wave["folder"]
+        suffix = wave["suffix"]
+        wave_dir = DICTATES_DIR / folder_name
 
-    for file_path in tqdm(txt_files, desc="Importing Submissions"):
-        filename = file_path.name
-        
-        if filename == TEACHER_FILENAME:
+        logger.info(f"\n📂 Traitement de la vague '{suffix}' dans le dossier : {wave_dir}")
+        if not wave_dir.exists():
+            logger.warning(f"⚠️ Dossier de vague introuvable : {wave_dir} (attendu pour la vague '{suffix}').")
             continue
 
-        match = FILENAME_PATTERN.match(filename)
+        full_title = f"{DICTATION_BASE_TITLE} ({suffix})"
+        dictation = session.exec(select(Dictation).where(Dictation.title == full_title)).first()
 
-        if not match:
-            logger.warning(f"⚠️ Format de fichier invalide (ignoré) : {filename}")
-            continue
-            
-        nom_file = match.group("nom")
-        prenom_file = match.group("prenom")
-        
-        key = (nom_file.lower(), prenom_file.lower())
-        uuid_str = uuid_map.get(key)
-        
-        if not uuid_str:
-            logger.debug(f"⚠️ Étudiant introuvable dans le mapping : {filename}")
-            missing_count += 1
-            continue
+        if not dictation:
+            dictation = Dictation(
+                title=full_title,
+                content_reference=content_ref,
+                rules_config={"DEFAULT": 1.0}
+            )
+            session.add(dictation)
+            session.flush()
+            session.refresh(dictation)
+            logger.info(f"✅ Dictée de référence créée {full_title} (ID: {dictation.id}).")
+        else:
+            logger.info(f"ℹ️ La dictée {full_title} existe déjà (ID: {dictation.id}).")
 
-        try:
-            target_uuid = uuid.UUID(uuid_str)
-        except ValueError: 
-            logger.warning(f"⚠️ UUID invalide dans le mapping : {uuid_str}")
-            missing_count += 1
-            continue
+        existing_submissions = { 
+            (sub.student_id, sub.dictation_id) 
+            for sub in session.exec(select(Submission).where(Submission.dictation_id == dictation.id)).all()
+        }
 
-        student_id = student_lookup.get(target_uuid)
-        
-        if not student_id:
-            logger.warning(f"⚠️ Étudiant {filename} a un UUID mais n'est pas en base.")
-            missing_count += 1
-            continue
+        txt_files = list(wave_dir.glob("*.txt"))
+        wave_added = 0
+        wave_missing = 0
 
-        if (student_id, dictation.id) in existing_submissions:
-            logger.debug(f"ℹ️ Copie déjà existante (ignorée) : {filename}")
-            continue
+        logger.info(f"📂 Importation des copies étudiantes pour '{suffix}'... ({len(txt_files)} fichiers à traiter).")
 
-        content = read_file_safely(file_path)
+        for file_path in tqdm(txt_files, desc=f"Importing Submissions for {suffix} Wave."):
+            if file_path.name == TEACHER_FILENAME:
+                continue
 
-        sub = Submission(
-            student_id=student_id,
-            dictation_id=dictation.id,
-            content_student=content,
-            scores={}
-        )
-        session.add(sub)
-        added_count += 1
+            match = FILENAME_PATTERN.match(file_path.name)
+            if not match:
+                logger.warning(f"⚠️ Format de fichier invalide (ignoré) : {file_path.name}")
+                continue
 
-    logger.info(f"✅ Traitement terminé : {added_count} nouvelles copies ajoutées.")
-    if missing_count > 0:
-        logger.warning(f"⚠️ {missing_count} fichiers ignorés (étudiants non reconnus dans le CSV secret).")
+            nom_file = match.group("nom")
+            prenom_file = match.group("prenom")
+
+            key = (nom_file.lower(), prenom_file.lower())
+            uuid_str = uuid_map.get(key)
+
+            if not uuid_str:
+                logger.debug(f"⚠️ Étudiant introuvable dans le mapping : {file_path.name}")
+                wave_missing += 1
+                continue
+
+            try:
+                target_uuid = uuid.UUID(uuid_str)
+            except ValueError:
+                logger.warning(f"⚠️ UUID invalide dans le mapping : {uuid_str}")
+                wave_missing += 1
+                continue
+
+            student_id = student_lookup.get(target_uuid)
+            if not student_id:
+                logger.warning(f"⚠️ Étudiant {file_path.name} a un UUID mais n'est pas en base.")
+                wave_missing += 1
+                continue
+
+            if (student_id, dictation.id) in existing_submissions:
+                logger.debug(f"ℹ️ Copie déjà existante (ignorée) : {file_path.name}")
+                continue
+
+            content = read_file_safely(file_path)
+            sub = Submission(
+                student_id=student_id,
+                dictation_id=dictation.id,
+                content_student=content,
+                scores={}
+            )
+            session.add(sub)
+            wave_added += 1
+
+        total_added += wave_added
+        logger.info(f"✅ Vague '{suffix}' : {wave_added} nouvelles copies ajoutées, {wave_missing} fichiers ignorés (étudiants non reconnus).")
+
+    logger.info(f"🎉 Importation des dictées terminée : {total_added} nouvelles copies ajoutées au total.")
 
 def reset_database(session: Session):
     """Supprime toutes les données des tables principales."""
@@ -343,6 +367,8 @@ def main():
     parser = argparse.ArgumentParser(description="Script d'importation des données initiales.")
     parser.add_argument("--reset-db", action="store_true", help="Réinitialiser la base de données avant l'importation.")
     args = parser.parse_args()
+
+    print_diagnostic()
 
     logger.info("🚀 Initialisation de la base de données...")
     init_db()
