@@ -26,7 +26,7 @@
 
 `docker-compose up -d --build`
 
-### Script de Seed
+#### Script de Seed
 
 - Pour un import standard (si la base est vide).
 `docker-compose exec backend python -m app.seed`
@@ -37,12 +37,17 @@
 - Pour tester (simulation).
 `docker-compose exec backend python -m app.seed --dry-run`
 
-### Script Check Names
+#### Script Check Names
 
-- Permet de vérifier la différence entre le nom de la dictée et le nom dans le CSV.
+- Permet de vérifier la différence entre le nom de la dictée et le nom de l'étudiant.
 `docker-compose exec backend python -m app.check_names`
 
-### Script Fix Files
+#### Script Fix Files
 
-- Si besoin de corréler les noms de fichiers similaires.
+- Permet de corréler les noms de fichiers similaires (dictée et étudiant).
 `docker-compose exec backend python -m app.fix_files`
+
+#### Script Check Mapping
+
+- Permet de voir si les étudiants matchent entre les différents CSV.
+`docker-compose exec backend python -m app.check_mapping`
