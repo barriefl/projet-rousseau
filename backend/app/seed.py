@@ -1,13 +1,13 @@
 import csv
+from dataclasses import dataclass, field
 import difflib
 import sys
 import os
 import uuid
 import logging
-import re
 import argparse
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from tqdm import tqdm
 from sqlmodel import Session, select, text
 
@@ -30,22 +30,62 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).parent.parent.parent
 DATA_DIR = Path(os.getenv("DATA_DIR", BASE_DIR / "data"))
-
-SECRET_CSV_PATH = DATA_DIR / "SECRET_correspondance.csv"
-
-SURVEY_CSV_PATH = DATA_DIR / "Enquête des antécédants 2024+2026.csv"
-
 DICTATES_DIR = DATA_DIR / "dictates"
-TEACHER_FILENAME = "GRAZIANO_Emmanuelle_graziaem.txt"
+RESULTS_DIR = DATA_DIR / "results"
 
-WAVES = [
-    { "folder": "data-initial", "suffix": "Initiale" },
-    { "folder": "data-final", "suffix": "Finale" }
-]
+FILES = {
+    "SECRET": DATA_DIR / "SECRET_correspondance.csv",
+    "SURVEY": DATA_DIR / "Enquête des antécédants 2024+2026.csv",
+    "TEACHER": DICTATES_DIR / "GRAZIANO_Emmanuelle_graziaem.txt",
+    "VOLTAIRE_INIT": RESULTS_DIR / "voltaire_initial.csv",
+    "VOLTAIRE_FINAL": RESULTS_DIR / "voltaire_final.csv",
+    "ECRIPLUS_INIT": RESULTS_DIR / "ecriplus_initial.csv",
+    "ECRIPLUS_FINAL": RESULTS_DIR / "ecriplus_final.csv"
+}
 
-DICTATION_BASE_TITLE = "Dictées Étude Rousseau"
+VOLTAIRE_COLS = {
+    AssessmentType.INITIAL: {
+        "score": "score évaluation initiale",
+        "details": {
+            "temps_initial": "temps évaluation initiale"
+        }
+    },
+    AssessmentType.FINAL: {
+        "score": "score évaluation evaluation finale",
+        "details": {
+            "temps_total": "temps total passé",
+            "duree_entrainement": "durée d'entraînement",
+            "niveau_atteint": "niveau atteint",
+            "progres": "progrès",
+            "tests_blancs": "variante tests blancs mensuels"
+        }
+    }
+}
 
-CSV_COLS = {
+ECRIPLUS_COLS = {
+    "global": ["% maitrise de l'ensemble", "% maîtrise de l'ensemble"],
+    "details": {
+        "score_articuler": ["articuler les termes"],
+        "score_construire": ["construire ses phrases"],
+        "score_orthographe_grammaticale": ["orthographe grammaticale"],
+        "score_conjugaison": ["marques de la conjugaison"],
+        "score_point_de_vue": ["points de vue adoptés"],
+        "score_effets_de_style": ["effets de style"],
+        "score_expression": ["ses mots et ses expressions"],
+        "score_comprehension": ["comprendre les mots"],
+        "score_vocabulaire": ["développer un vocabulaire étendu"],
+        "score_orthographe_lexicale": ["orthographe des mots"],
+        "score_enchainement": ["enchaîner les phrases"],
+        "score_organisation": ["organiser ses textes"],
+        "score_reprise": ["utiliser des reprises"],
+        "score_domaine_phrase": ["domaine de la phrase"],
+        "score_domaine_discours": ["domaine du discours"],
+        "score_domaine_mot": ["domaine du mot"],
+        "score_domaine_texte": ["domaine du texte"]
+    }
+}
+
+SURVEY_MAPPING = {
     "nom": "15. nom",
     "prenom": "16. prenom",
     "td": "17. td",
@@ -61,25 +101,43 @@ CSV_COLS = {
     "p2_csp": "13. CSP_parent2"
 }
 
-FILENAME_PATTERN = re.compile(r'^(?P<nom>[^_]+)_(?P<prenom>[^_]+)(?:_.*)?\.txt$')
+# FILENAME_PATTERN = re.compile(r'^(?P<nom>[^_]+)_(?P<prenom>[^_]+)(?:_.*)?\.txt$')
 
-RESULTS_DIR = DATA_DIR / "results"
+# Stats.
+@dataclass
+class ImportStats:
+    students_created: int = 0
+    students_skipped: int = 0
+    voltaire_imported: int = 0
+    ecriplus_imported: int = 0
+    dictations_imported: int = 0
+    errors: List[str] = field(default_factory=list)
 
-VOLTAIRE_FILES = {
-    AssessmentType.INITIAL: "voltaire_initial.csv",
-    AssessmentType.FINAL: "voltaire_final.csv"
-}
-ECRIPLUS_FILES = {
-    AssessmentType.INITIAL: "ecriplus_initial.csv",
-    AssessmentType.FINAL: "ecriplus_final.csv"
-}
+    def print_summary(self, dry_run: bool):
+        print("\n" + "="*40)
+        print(f"📊 RAPPORT D'IMPORTATION {'(DRY RUN)' if dry_run else ''}")
+        print("="*40)
+        print(f"👥 Étudiants   : {self.students_created} créés / {self.students_skipped} ignorés")
+        print(f"⚡ Voltaire    : {self.voltaire_imported} résultats")
+        print(f"✍️  Ecri+       : {self.ecriplus_imported} résultats")
+        print(f"📝 Dictées     : {self.dictations_imported} copies")
+        print("-" * 40)
+        if self.errors:
+            print(f"❌ {len(self.errors)} ERREURS RENCONTRÉES :")
+            for e in self.errors[:10]:
+                print(f"  - {e}")
+            if len(self.errors) > 10: print("  ... (voir logs pour le reste)")
+        else:
+            print("✅ AUCUNE ERREUR DÉTECTÉE.")
+        print("="*40 + "\n")
 
-ECRIPLUS_MAP = {
-    "score_articuler": ["articuler les termes"],
-    "score_construire": ["construire ses phrases"],
-    "score_orthographe": ["orthographe grammaticale"],
-    "score_vocabulaire": ["effets de style", "vocabulaire"]
-}
+# Fonctions (helpers).
+def normalize_text(text: str) -> str:
+    """Nettoyage standard des chaînes (minuscule, sans accents/espaces superflus)."""
+    if not text: 
+        return ""
+    text = text.strip().lower().replace("-", " ").replace("_", " ")
+    return " ".join(text.split())
 
 def clean_float(value: str) -> float:
     """Convertit '0,88', '43 %', '40 %' en float 0.0-1.0."""
@@ -94,479 +152,465 @@ def clean_float(value: str) -> float:
     except ValueError:
         return 0.0
     
-def normalize_name(text):
-    if not text: return ""
-    text = text.strip().lower().replace("-", " ").replace("_", " ")
-    return " ".join(text.split())
-
-def find_student_id(session, nom: str, prenom: str, uuid_map: Dict) -> Optional[int]:
-    """
-    Cherche un étudiant de manière intelligente (Exacte -> Inversée -> Floue).
-    """
-    if not nom or not prenom: return None
-
-    n_nom = normalize_name(nom)
-    n_prenom = normalize_name(prenom)
-    
-    # Tentative Exacte.
-    key = (n_nom, n_prenom)
-    uuid_str = uuid_map.get(key)
-
-    # Tentative Inversée (Si le CSV a inversé Nom/Prénom).
-    if not uuid_str:
-        uuid_str = uuid_map.get((n_prenom, n_nom))
-        if uuid_str:
-            logger.info(f"   🔄 Inversion détectée pour : {nom} {prenom}")
-
-    # Tentative Floue (Fuzzy Matching).
-    if not uuid_str:
-        candidates = {f"{k[0]} {k[1]}": k for k in uuid_map.keys()}
-        
-        target = f"{n_nom} {n_prenom}"
-        matches = difflib.get_close_matches(target, candidates.keys(), n=1, cutoff=0.80)
-        
-        if matches:
-            best_match_str = matches[0]
-            best_key = candidates[best_match_str]
-            uuid_str = uuid_map[best_key]
-            
-            logger.warning(f"   🪄 Autocorrection : '{nom} {prenom}' -> '{best_key[0]} {best_key[1]}' (Score élevé).")
-
-    if not uuid_str:
-        logger.debug(f"   ❌ Introuvable : {nom} {prenom}.")
+def get_enum_safe(enum_cls, value: str):
+    """Tente de matcher un string avec un Enum (insensible à la casse)."""
+    if not value: 
         return None
-        
-    try:
-        res = session.exec(select(Student.id).where(Student.anonymous_id == uuid.UUID(uuid_str))).first()
-        return res
-    except:
-        return None
-
-def print_diagnostic():
-    logger.info(f"🔍 Diagnostic de l'environnement de données :")
-    logger.info(f"   -> DATA_DIR = {DATA_DIR} ({'✅ Présent' if DATA_DIR.exists() else '❌ Absent'})")
-    logger.info(f"   -> DICTATES_DIR = {DICTATES_DIR} ({'✅ Présent' if DICTATES_DIR.exists() else '❌ Absent'})")
-
-    if DICTATES_DIR.exists():
-        files = list(DICTATES_DIR.iterdir())
-        logger.info(f"   -> Contenu de DICTATES_DIR : {[f.name for f in files]}")
-    else:
-        logger.error("   ❌ Le dossier 'dictates' est introuvable dans /data !")
-
-def read_file_safely(file_path: Path) -> str:
-    """Lit un fichier en essayant différentes encodages."""
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return f.read().strip()
-    except UnicodeDecodeError:
-        with open(file_path, 'r', encoding='latin-1') as f:
-            return f.read().strip()
-    except Exception as e:
-        logger.error(f"❌ Erreur lors de la lecture du fichier {file_path} : {e}")
-        return ""
-
-def get_enum_value(enum_class, value: str):
-    """
-    Tente de convertir une chaîne CSV en Enum.
-    Si la valeur ne correspond pas exactement, renvoie None.
-    """
-    if not value or not value.strip():
-        return None
-    
-    clean_value = value.strip()
-    
-    # Tentative 1 : Correspondance exacte.
-    try:
-        return enum_class(clean_value)
-    except ValueError:
-        pass
-        
-    # Tentative 2 : Gestion des cas particuliers (espaces, casse...).
-    for member in enum_class:
-        if member.value.lower() == clean_value.lower():
+    val_clean = value.strip().lower()
+    for member in enum_cls:
+        if member.value.lower() == val_clean:
             return member
-            
-    logger.warning(f"⚠️ Attention : Valeur '{clean_value}' inconnue pour {enum_class.__name__}")
     return None
 
-def load_uuid_map() -> Dict[Tuple[str, str], str]:
-    """
-    Charge le fichier de correspondance pour garantir la pseudonymisation constante.
-    Retourne un dictionnaire : {(nom_lower, prenom_lower): 'UUID_STRING'}
-    """
-    mapping = {}
-    
-    if not SECRET_CSV_PATH.exists():
-        logger.error(f"⚠️  ATTENTION : Fichier de correspondance introuvable : {SECRET_CSV_PATH}")
+def find_col_by_keyword(headers: List[str], keyword: str) -> Optional[str]:
+    """Trouve le nom exact d'une colonne contenant un mot-clé."""
+    keyword = keyword.lower()
+    for h in headers:
+        if keyword in h.lower():
+            return h
+    return None
+
+# Services Métier.
+class StudentService:
+    def __init__(self, session: Session, stats: ImportStats, dry_run: bool = False):
+        self.session = session
+        self.stats = stats
+        self.dry_run = dry_run
+        self.uuid_map = self._load_uuid_map()
+        self.student_cache: Dict[uuid.UUID, int] = {}
+        self._refresh_cache()
+
+    def _refresh_cache(self):
+        """Met à jour le cache local des étudiants."""
+        if self.dry_run:
+            return
+        students = self.session.exec(select(Student.id, Student.anonymous_id)).all()
+        self.student_cache = {s.anonymous_id: s.id for s in students}
+        logger.debug(f"🧠 Cache étudiant mis à jour : {len(self.student_cache)} entrées.")
+
+    def _load_uuid_map(self) -> Dict[Tuple[str, str], str]:
+        """Charge le fichier SECRET_correspondance.csv."""
+        mapping = {}
+        path = FILES["SECRET"]
+        if not path.exists():
+            self.stats.errors.append(f"Fichier secret manquant: {FILES['SECRET']}")
+            return mapping
+
+        for encoding in ['utf-8-sig', 'cp1252', 'latin-1']:
+            try:
+                with open(path, 'r', encoding=encoding) as f:
+                    sample = f.read(1024)
+                    f.seek(0)
+
+                    try:
+                        dialect = csv.Sniffer().sniff(sample, delimiters=[',', ';', '\t'])
+                    except:
+                        dialect = csv.Dialect
+                        dialect.delimiter = ';' if ';' in sample else ','
+
+                    reader = csv.DictReader(f, dialect=dialect)
+
+                    headers = [h.lower() for h in reader.fieldnames or []]
+                    if not any("nom" in h for h in headers):
+                        continue
+                    
+                    for row in reader:
+                        clean = {k.strip().lower(): v.strip() for k, v in row.items() if k}
+                        nom = clean.get("nom")
+                        prenom = clean.get("prenom") or clean.get("prénom")
+                        uuid_val = clean.get("uuid") or clean.get("uuid4")
+                        
+                        if nom and prenom and uuid_val:
+                            key = (normalize_text(nom), normalize_text(prenom))
+                            mapping[key] = uuid_val
+
+                            key = (normalize_text(prenom), normalize_text(nom))
+                            mapping[key] = uuid_val
+                    
+                    if mapping:
+                        logger.info(f"✅ Mapping chargé ({len(mapping)} entrées) avec {encoding} et délimiteur '{dialect.delimiter}'.")
+                        return mapping
+            except: 
+                continue
+        logger.error("❌ Impossible de lire le fichier de correspondance (aucun encodage/délimiteur ne fonctionne).")
         return mapping
-
-    logger.info(f"🔑 Chargement de la table de correspondance : {SECRET_CSV_PATH.name}")
-
-    encodings = ['utf-8-sig', 'cp1252', 'latin-1', 'utf-8']
     
-    for encoding in encodings:
-        try:
-            with open(SECRET_CSV_PATH, mode="r", encoding=encoding) as f:
-                reader = csv.DictReader(f, delimiter=";") 
-
-                if not reader.fieldnames:
-                    logger.error(f"❌ Le fichier de correspondance est vide ou mal formaté avec l'encodage {encoding}.")
-                    return mapping
-                
-                headers = [h.lower() for h in reader.fieldnames]
-                required = ["nom", "prenom", "uuid"]
-
-                if not any('nom' in h for h in headers):
-                    logger.warning(f"⚠️ Colonnes suspectes avec {encoding} : {reader.fieldnames}.")
-                    continue
-                
-                count = 0
-                for row in reader:
-                    clean_row = {k.strip().lower(): v.strip() for k, v in row.items() if k}
-                    nom = clean_row.get("nom")
-                    prenom = clean_row.get("prenom") or clean_row.get("prénom")
-                    uuid_val = clean_row.get("uuid") or clean_row.get("uuid4")
-
-                    if nom and prenom and uuid_val:
-                        key = (nom.lower(), prenom.lower())
-                        mapping[key] = uuid_val
-                        count += 1
-
-                if count > 0:
-                    logger.info(f"✅ SUCCÈS : {count} identités chargées avec l'encodage '{encoding}'.")
-                    return mapping
-                else:
-                    logger.warning(f"⚠️ Fichier lu avec {encoding} mais aucune donnée valide trouvée.")
-
-        except UnicodeDecodeError:
-            logger.warning(f"⚠️ Échec de la lecture avec l'encodage {encoding}, tentative suivante...")
-            continue
-        except Exception as e:
-            logger.error(f"❌ Erreur inattendue lors de la lecture du fichier de correspondance avec {encoding} : {e}")
-            return {}
+    def get_student_id(self, nom: str, prenom: str) -> Optional[int]:
+        """Récupère l'ID étudiant avec Fuzzy Matching (tolérance aux fautes)."""
+        if not nom or not prenom: 
+            return None
         
-    logger.error("❌ Échec de la lecture du fichier de correspondance avec tous les encodages.")
-    return mapping
+        n_nom, n_prenom = normalize_text(nom), normalize_text(prenom)
+        
+        # Match Exact.
+        uuid_str = self.uuid_map.get((n_nom, n_prenom))
+        
+        # Match Inversé (Nom <-> Prénom).
+        if not uuid_str:
+            uuid_str = self.uuid_map.get((n_prenom, n_nom))
 
-def seed_students(session: Session, uuid_map: Dict):
-    """Lit l'enquête et importe les étudiants en utilisant l'UUID map."""
-    if not SURVEY_CSV_PATH.exists():
-        logger.error(f"❌ Erreur : Le fichier d'enquête est introuvable ici : {SURVEY_CSV_PATH}")
-        return
+        # Match Flou (Fuzzy).
+        if not uuid_str:
+            candidates = {f"{k[0]} {k[1]}": k for k in self.uuid_map.keys()}
+            target = f"{n_nom} {n_prenom}"
+            matches = difflib.get_close_matches(target, candidates.keys(), n=1, cutoff=0.85)
+            
+            if matches:
+                best_key = candidates[matches[0]]
+                uuid_str = self.uuid_map[best_key]
+                logger.debug(f"🪄 Correction: {nom} {prenom} -> {best_key}")
+
+        if not uuid_str: 
+            return None
+        
+        if self.dry_run:
+            return 999999
+        
+        try:
+            target_uuid = uuid.UUID(uuid_str)
+            return self.student_cache.get(target_uuid)
+        except: 
+            return None
+
+    def import_survey(self):
+        """Importe les étudiants depuis l'enquête."""
+        path = FILES["SURVEY"]
+        if not path.exists(): 
+            return
+
+        simulated_uuids = set()
+
+        encodings = ['utf-8-sig', 'cp1252', 'latin-1']
+        for encoding in encodings:
+            try:
+                with open(path, 'r', encoding=encoding) as f:
+                    reader = csv.DictReader(f, delimiter=';')
+
+                    if not reader.fieldnames: 
+                        continue
+
+                    rows = list(reader)
+                    for row in tqdm(rows, desc="Import Étudiants"):
+                        nom = row.get(SURVEY_MAPPING["nom"])
+                        prenom = row.get(SURVEY_MAPPING["prenom"])
+                        
+                        n_nom, n_prenom = normalize_text(nom), normalize_text(prenom)
+                        uuid_str = self.uuid_map.get((n_nom, n_prenom))
+                        uid = uuid.UUID(uuid_str) if uuid_str else uuid.uuid4()
+                        
+                        if uid in self.student_cache or uid in simulated_uuids:
+                            self.stats.students_skipped += 1
+                            continue
+
+                        if not self.dry_run:
+                            s = Student(
+                                anonymous_id=uid,
+                                td_group=row.get(SURVEY_MAPPING["td"], "Inconnu"),
+
+                                has_library=get_enum_safe(Library, row.get(SURVEY_MAPPING["biblio"])),
+                                reading_support=get_enum_safe(ReadingSupport, row.get(SURVEY_MAPPING["support"])),
+                                reading_works=row.get(SURVEY_MAPPING["oeuvres"]),
+                                motive=row.get(SURVEY_MAPPING["motif"]),
+                                appetence_level=row.get(SURVEY_MAPPING["appetence"]),
+                                declared_level=row.get(SURVEY_MAPPING["niveau"]),
+
+                                parent_1_degree=get_enum_safe(Degree, row.get(SURVEY_MAPPING["p1_dip"])),
+                                parent_1_csp=get_enum_safe(CSP, row.get(SURVEY_MAPPING["p1_csp"])),
+                                parent_2_degree=get_enum_safe(Degree, row.get(SURVEY_MAPPING["p2_dip"])),
+                                parent_2_csp=get_enum_safe(CSP, row.get(SURVEY_MAPPING["p2_csp"])),
+                            )
+                            self.session.add(s)
+
+                        simulated_uuids.add(uid)
+                        self.stats.students_created += 1
+                    break
+            except UnicodeDecodeError:
+                continue
+        
+        if not self.dry_run:
+            self.session.commit()
+            self._refresh_cache()
+
+class AssessmentImporter:
+    def __init__(self, session: Session, student_service: StudentService, stats: ImportStats, dry_run: bool):
+        self.session = session
+        self.student_service = student_service
+        self.stats = stats
+        self.dry_run = dry_run
+
+    def _upsert_result(self, sid: int, platform: Platform, a_type: AssessmentType, score: float, details: dict):
+        """Insère ou met à jour un résultat."""
+        if self.dry_run: 
+            return True
+
+        existing = self.session.exec(select(AssessmentResult).where(
+            AssessmentResult.student_id == sid,
+            AssessmentResult.platform == platform,
+            AssessmentResult.type == a_type
+        )).first()
+
+        if not existing:
+            res = AssessmentResult(
+                student_id=sid,
+                platform=platform,
+                type=a_type,
+                score=score,
+                details=details
+            )
+            self.session.add(res)
+            return True
+        return False
     
-    existing_uuids = set(session.exec(select(Student.anonymous_id)).all())
+    def _read_csv_content(self, path: Path) -> List[Dict[str, str]]:
+        """Lit un CSV avec détection automatique d'encodage et séparateur."""
+        encodings = ['utf-8-sig', 'utf-8', 'cp1252', 'latin-1']
+        delimiters = [';', ',', '\t']
+        
+        for encoding in encodings:
+            try:
+                with open(path, 'r', encoding=encoding) as f:
+                    sample = f.read(4096)
+                    f.seek(0)
+                    
+                    dialect = None
+                    try:
+                        dialect = csv.Sniffer().sniff(sample, delimiters=delimiters)
+                    except:
+                        for d in delimiters:
+                            if d in sample:
+                                dialect = csv.Dialect
+                                dialect.delimiter = d
+                                break
+                    
+                    if not dialect: 
+                        continue
+
+                    reader = csv.DictReader(f, delimiter=dialect.delimiter)
+                    return list(reader)
+            except (UnicodeDecodeError, csv.Error):
+                continue
+        
+        raise ValueError(f"Impossible de lire le fichier {path.name} (Encodage inconnu).")
     
-    logger.info(f"📂 Lecture du fichier : {SURVEY_CSV_PATH}")
-    
-    try:
-        with open(SURVEY_CSV_PATH, mode="r", encoding="utf-8-sig") as f:
-            rows = list(csv.DictReader(f, delimiter=";"))
+    def _get_col_name(self, headers: List[str], keywords: List[str]) -> Optional[str]:
+        """Cherche une colonne correspondant aux mots-clés, en évitant les pièges."""
+        normalized_headers = {h.lower(): h for h in headers}
+        
+        for kw in keywords:
+            target = f"{kw} du participant"
+            if target in normalized_headers:
+                return normalized_headers[target]
+
+        for kw in keywords:
+            for h_clean, h_real in normalized_headers.items():
+                if kw in h_clean:
+                    if "nom" in kw and ("organisation" in h_clean or "campagne" in h_clean or "utilisateur" in h_clean):
+                        continue
+                    return h_real
+        return None
+
+    def import_voltaire(self):
+        """Logique spécifique Voltaire."""
+        configs = [
+            (AssessmentType.INITIAL, FILES["VOLTAIRE_INIT"]),
+            (AssessmentType.FINAL, FILES["VOLTAIRE_FINAL"])
+        ]
+
+        for a_type, path in configs:
+            if not path.exists(): 
+                continue
+            count = 0
+            
+            try: 
+                rows = self._read_csv_content(path)
+                if not rows:
+                    logger.warning(f"⚠️ Fichier vide ou illisible : {path.name}")
+                    continue
+
+                headers = list(rows[0].keys())
+                config = VOLTAIRE_COLS[a_type] 
+                
+                col_score = find_col_by_keyword(headers, config["score"])
+                col_details = {}
+                for key, keyword in config["details"].items():
+                    if key == "tests_blancs":
+                        cols = [h for h in headers if keyword in h.lower()]
+                        if cols: col_details[key] = cols
+                    else:
+                        col = find_col_by_keyword(headers, keyword)
+                        if col: col_details[key] = col
+
+                col_nom = self._get_col_name(headers, ["nom"])
+                col_prenom = self._get_col_name(headers, ["prénom", "prenom"])
+
+                for row in rows: 
+                    nom = row.get(col_nom)
+                    prenom = row.get(col_prenom)
+                    
+                    sid = self.student_service.get_student_id(nom, prenom)
+                    if not sid: 
+                        continue
+
+                    score = clean_float(row.get(col_score)) if col_score else 0.0
+                    
+                    details = {}
+                    for key, col_name in col_details.items():
+                        if key == "tests_blancs":
+                            tests = [clean_float(row.get(c)) for c in col_name if row.get(c)]
+                            if tests: 
+                                details[key] = tests
+                        else:
+                            val = row.get(col_name)
+                            if val: 
+                                details[key] = val
+
+                    if self._upsert_result(sid, Platform.VOLTAIRE, a_type, score, details):
+                        count += 1
+            
+                if not self.dry_run:
+                    self.session.commit()
+                self.stats.voltaire_imported += count
+            except Exception as e:
+                self.stats.errors.append(f"Erreur Voltaire {path.name}: {e}")
+
+    def import_ecriplus(self):
+        """Logique spécifique Ecri+."""
+        configs = [
+            (AssessmentType.INITIAL, FILES["ECRIPLUS_INIT"]),
+            (AssessmentType.FINAL, FILES["ECRIPLUS_FINAL"])
+        ]
+
+        for a_type, path in configs:
+            if not path.exists(): 
+                continue
             count = 0
 
-            for row in tqdm(rows, desc="Importing Students"):
-                nom = row.get(CSV_COLS["nom"], "").strip()
-                prenom = row.get(CSV_COLS["prenom"], "").strip()
-
-                if not nom or not prenom:
+            try:
+                rows = self._read_csv_content(path)
+                if not rows:
+                    logger.warning(f"⚠️ Fichier vide ou illisible : {path.name}")
                     continue
 
-                key = (normalize_name(nom), normalize_name(prenom))
-                uuid_str = uuid_map.get(key)
-
-                if uuid_str:
-                    try:
-                        student_uuid = uuid.UUID(uuid_str)
-                    except ValueError:
-                        logger.warning(f"⚠️ UUID invalide dans la correspondance pour : {nom} {prenom}.")
-                        continue
-                else:
-                    student_uuid = uuid.uuid4()
-                    logger.debug(f"⚠️  Nouveau UUID généré pour : {nom} {prenom}")
-
-                if student_uuid in existing_uuids:
-                    logger.debug(f"ℹ️ Étudiant déjà existant (ignoré) : {nom} {prenom}")
-                    continue
-
-                student = Student(
-                    anonymous_id=student_uuid,
-                    td_group=row.get(CSV_COLS["td"], "Inconnu"),
-                    
-                    has_library=get_enum_value(Library, row.get(CSV_COLS["biblio"])),
-                    reading_support=get_enum_value(ReadingSupport, row.get(CSV_COLS["support"])),
-                    
-                    reading_works=row.get(CSV_COLS["oeuvres"]),
-                    motive=row.get(CSV_COLS["motif"]),
-                    appetence_level=row.get(CSV_COLS["appetence"]),
-                    declared_level=row.get(CSV_COLS["niveau_declare"]),
-                    
-                    parent_1_degree=get_enum_value(Degree, row.get(CSV_COLS["p1_dip"])),
-                    parent_1_csp=get_enum_value(CSP, row.get(CSV_COLS["p1_csp"])),
-                    parent_2_degree=get_enum_value(Degree, row.get(CSV_COLS["p2_dip"])),
-                    parent_2_csp=get_enum_value(CSP, row.get(CSV_COLS["p2_csp"])),
-                )
+                headers = list(rows[0].keys())
                 
-                session.add(student)
-                existing_uuids.add(student_uuid)
-                count += 1
-
-            logger.info(f"💾 Enregistrement des étudiants en base de données... ({count} étudiants ajoutés).")
-    except Exception as e:
-        logger.error(f"❌ Erreur lors de l'importation des étudiants : {e}")
-        raise e
-    
-def seed_results_unified(session: Session, uuid_map: Dict):
-    logger.info("📊 Importation Résultats Unifiés...")
-    
-    # --- VOLTAIRE ---
-    for type_enum, fname in VOLTAIRE_FILES.items():
-        fpath = RESULTS_DIR / fname
-        if not fpath.exists(): continue
-        
-        count = 0
-        try:
-            with open(fpath, 'r', encoding='utf-8-sig') as f:
-                # Détection délimiteur (virgule ou point-virgule)
-                dialect = csv.Sniffer().sniff(f.read(1024))
-                f.seek(0)
-                reader = csv.DictReader(f, dialect=dialect)
-                
-                for row in reader:
-                    # Nettoyage header
-                    row = {k.strip().lower(): v for k, v in row.items() if k}
-                    
-                    nom = row.get('nom')
-                    prenom = row.get('prénom') or row.get('prenom')
-                    if not nom or not prenom: continue
-                    
-                    sid = find_student_id(session, nom, prenom, uuid_map)
-                    if not sid: continue
-
-                    # Recherche Score et Durée (Logique floue selon colonnes)
-                    score_val = 0.0
-                    details = {}
-                    
-                    for k, v in row.items():
-                        # Score
-                        if "score" in k:
-                            # Priorité au type courant
-                            if (type_enum == AssessmentType.FINAL and "final" in k) or \
-                               (type_enum == AssessmentType.INITIAL and "initial" in k) or \
-                               ("score" in k and score_val == 0.0):
-                                score_val = clean_float(v)
-                        
-                        # Durée / Temps
-                        if "temps" in k or "durée" in k:
-                            details["duration"] = v
-                        
-                        # Niveau
-                        if "niveau" in k:
-                            details["level"] = v
-
-                    # Upsert (Insert si n'existe pas)
-                    exists = session.exec(select(AssessmentResult).where(
-                        AssessmentResult.student_id == sid,
-                        AssessmentResult.platform == Platform.VOLTAIRE,
-                        AssessmentResult.type == type_enum
-                    )).first()
-                    
-                    if not exists:
-                        res = AssessmentResult(
-                            student_id=sid,
-                            platform=Platform.VOLTAIRE,
-                            type=type_enum,
-                            score=score_val,
-                            details=details
-                        )
-                        session.add(res)
-                        count += 1
-            logger.info(f"   ⚡ Voltaire {type_enum.value}: {count} importés.")
-        except Exception as e:
-            logger.error(f"   ❌ Erreur Voltaire {fname}: {e}")
-
-    # --- ECRI+ ---
-    for type_enum, fname in ECRIPLUS_FILES.items():
-        fpath = RESULTS_DIR / fname
-        if not fpath.exists(): continue
-        
-        count = 0
-        try:
-            with open(fpath, 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f, delimiter=';')
-                
-                # Mapping dynamique des colonnes
-                col_map = {}
-                headers = [h.lower() for h in reader.fieldnames or []]
-                
-                # Trouve la colonne Global
-                for h in reader.fieldnames:
-                    if "ensemble" in h.lower() and "%" in h:
-                        col_map["global"] = h
+                col_global = None
+                for kw in ECRIPLUS_COLS["global"]:
+                    col = find_col_by_keyword(headers, kw)
+                    if col: 
+                        col_global = col
                         break
                 
-                # Trouve les sous-compétences
-                for key, keywords in ECRIPLUS_MAP.items():
-                    for h in reader.fieldnames:
-                        h_low = h.lower()
-                        if any(kw in h_low for kw in keywords) and "%" in h:
-                            col_map[key] = h
+                col_details = {}
+                for key, keywords in ECRIPLUS_COLS["details"].items():
+                    for kw in keywords:
+                        col = next((h for h in headers if kw in h.lower() and "%" in h), None)
+                        if col:
+                            col_details[key] = col
                             break
 
-                for row in reader:
-                    nom = row.get("Nom du Participant") or row.get("Nom")
-                    prenom = row.get("Prénom du Participant") or row.get("Prénom")
-                    if not nom or not prenom: continue
-                    
-                    sid = find_student_id(session, nom, prenom, uuid_map)
-                    if not sid: continue
+                col_nom = self._get_col_name(headers, ["nom"])
+                col_prenom = self._get_col_name(headers, ["prénom", "prenom"])
 
-                    exists = session.exec(select(AssessmentResult).where(
-                        AssessmentResult.student_id == sid,
-                        AssessmentResult.platform == Platform.ECRIPLUS,
-                        AssessmentResult.type == type_enum
-                    )).first()
+                if not col_nom or not col_prenom:
+                    logger.warning(f"⚠️ Colonnes Nom/Prénom introuvables dans {path.name}")
+                    continue
+                
+                for row in rows:
+                    nom = row.get(col_nom)
+                    prenom = row.get(col_prenom)
                     
-                    if not exists:
-                        # Score Global
-                        score_col = col_map.get("global")
-                        global_score = clean_float(row.get(score_col)) if score_col else 0.0
-                        
-                        # Détails (Sous-scores)
-                        details = {}
-                        for k, col in col_map.items():
-                            if k != "global":
-                                details[k] = clean_float(row.get(col))
+                    sid = self.student_service.get_student_id(nom, prenom)
+                    if not sid: 
+                        continue
 
-                        res = AssessmentResult(
-                            student_id=sid,
-                            platform=Platform.ECRIPLUS,
-                            type=type_enum,
-                            score=global_score,
-                            details=details
-                        )
-                        session.add(res)
+                    score = clean_float(row.get(col_global)) if col_global else 0.0
+                    
+                    details = {}
+                    for key, col_name in col_details.items():
+                        details[key] = clean_float(row.get(col_name))
+
+                    if self._upsert_result(sid, Platform.ECRIPLUS, a_type, score, details):
                         count += 1
-            logger.info(f"   ✍️ Ecri+ {type_enum.value}: {count} importés.")
-        except Exception as e:
-            logger.error(f"   ❌ Erreur Ecri+ {fname}: {e}")
+            
+                if not self.dry_run:
+                    self.session.commit()
+                self.stats.ecriplus_imported += count
+            except Exception as e:
+                self.stats.errors.append(f"Erreur Ecri+ {path.name}: {e}")
     
-def seed_dictation_files(session: Session, uuid_map: Dict):
-    """
-    Lit les fichiers .txt dans /data/dictates.
-    1. Crée la Dictée de référence (Mme Graziano).
-    2. Crée les Submissions pour les étudiants trouvés.
-    """
-    if not DICTATES_DIR.exists():
-        logger.warning(f"Dossier dictées introuvable : {DICTATES_DIR}")
-        return
+def seed_dictations(session: Session, student_service: StudentService, stats: ImportStats, dry_run: bool):
+    """Import des dictées (par vague)."""
+    if not DICTATES_DIR.exists(): return
+    if not FILES["TEACHER"].exists(): return
 
-    logger.info(f"Traitement des dictées dans : {DICTATES_DIR}")
+    try:
+        ref_txt = FILES["TEACHER"].read_text(encoding="utf-8").strip()
+    except:
+        ref_txt = FILES["TEACHER"].read_text(encoding="latin-1").strip()
 
-    teacher_path = DICTATES_DIR / TEACHER_FILENAME
-    if not teacher_path.exists():
-        logger.error(f"❌ Erreur critique : Le fichier enseignant {TEACHER_FILENAME} est absent !")
-        return
-    
-    content_ref = read_file_safely(teacher_path)
+    waves = [("data-initial", "Initiale"), ("data-final", "Finale")]
 
-    all_students = session.exec(select(Student)).all()
-    student_lookup = {s.anonymous_id: s.id for s in all_students}
-
-    total_added = 0
-
-    for wave in WAVES:
-        folder_name = wave["folder"]
-        suffix = wave["suffix"]
-        wave_dir = DICTATES_DIR / folder_name
-
-        logger.info(f"\n📂 Traitement de la vague '{suffix}' dans le dossier : {wave_dir}")
-        if not wave_dir.exists():
-            logger.warning(f"⚠️ Dossier de vague introuvable : {wave_dir} (attendu pour la vague '{suffix}').")
+    for folder, suffix in waves:
+        wave_dir = DICTATES_DIR / folder
+        if not wave_dir.exists(): 
             continue
 
-        full_title = f"{DICTATION_BASE_TITLE} ({suffix})"
-        dictation = session.exec(select(Dictation).where(Dictation.title == full_title)).first()
+        dictation_id = 999
 
-        if not dictation:
-            dictation = Dictation(
-                title=full_title,
-                content_reference=content_ref,
-                rules_config={"DEFAULT": 1.0}
-            )
-            session.add(dictation)
-            session.flush()
-            session.refresh(dictation)
-            logger.info(f"✅ Dictée de référence créée {full_title} (ID: {dictation.id}).")
-        else:
-            logger.info(f"ℹ️ La dictée {full_title} existe déjà (ID: {dictation.id}).")
+        if not dry_run:
+            title = f"Dictées Étude Rousseau ({suffix})"
+            dictation = session.exec(select(Dictation).where(Dictation.title == title)).first()
+            if not dictation:
+                dictation = Dictation(title=title, content_reference=ref_txt, rules_config={"DEFAULT": 1.0})
+                session.add(dictation)
+                session.commit()
+                session.refresh(dictation)
+            dictation_id = dictation.id
+        
+        existing = set()
+        if not dry_run:
+            existing = {(s.student_id, s.dictation_id) for s in session.exec(
+                select(Submission).where(Submission.dictation_id == dictation_id)
+            ).all()}
 
-        existing_submissions = { 
-            (sub.student_id, sub.dictation_id) 
-            for sub in session.exec(select(Submission).where(Submission.dictation_id == dictation.id)).all()
-        }
-
-        txt_files = list(wave_dir.glob("*.txt"))
-        wave_added = 0
-        wave_missing = 0
-
-        logger.info(f"📂 Importation des copies étudiantes pour '{suffix}'... ({len(txt_files)} fichiers à traiter).")
-
-        for file_path in tqdm(txt_files, desc=f"Importing Submissions for {suffix} Wave."):
-            if file_path.name == TEACHER_FILENAME:
+        count = 0
+        for f in wave_dir.glob("*.txt"):
+            if "GRAZIANO" in f.name: 
                 continue
-
-            match = FILENAME_PATTERN.match(file_path.name)
-            if not match:
-                logger.warning(f"⚠️ Format de fichier invalide (ignoré) : {file_path.name}")
+            
+            parts = f.stem.split('_')
+            if len(parts) < 2: 
                 continue
+            
+            sid = student_service.get_student_id(parts[0], parts[1])
 
-            nom_file = match.group("nom")
-            prenom_file = match.group("prenom")
+            if sid and (sid, dictation_id) not in existing:
+                if not dry_run:
+                    try:
+                        content = f.read_text(encoding='utf-8', errors='ignore').strip()
+                        sub = Submission(
+                            student_id=sid, 
+                            dictation_id=dictation_id, 
+                            content_student=content, 
+                            scores={}
+                        )
+                        session.add(sub)
+                        count += 1
+                    except Exception as e: 
+                        stats.errors.append(f"Erreur dictée {f.name}: {e}")
+                else:
+                    count += 1
 
-            key = (nom_file.lower(), prenom_file.lower())
-            uuid_str = uuid_map.get(key)
+        if not dry_run:
+            session.commit()
+        stats.dictations_imported += count
 
-            if not uuid_str:
-                logger.debug(f"⚠️ Étudiant introuvable dans le mapping : {file_path.name}")
-                wave_missing += 1
-                continue
+# Main.
 
-            try:
-                target_uuid = uuid.UUID(uuid_str)
-            except ValueError:
-                logger.warning(f"⚠️ UUID invalide dans le mapping : {uuid_str}")
-                wave_missing += 1
-                continue
-
-            student_id = student_lookup.get(target_uuid)
-            if not student_id:
-                logger.warning(f"⚠️ Étudiant {file_path.name} a un UUID mais n'est pas en base.")
-                wave_missing += 1
-                continue
-
-            if (student_id, dictation.id) in existing_submissions:
-                logger.debug(f"ℹ️ Copie déjà existante (ignorée) : {file_path.name}")
-                continue
-
-            content = read_file_safely(file_path)
-            sub = Submission(
-                student_id=student_id,
-                dictation_id=dictation.id,
-                content_student=content,
-                scores={}
-            )
-            session.add(sub)
-            wave_added += 1
-
-        total_added += wave_added
-        logger.info(f"✅ Vague '{suffix}' : {wave_added} nouvelles copies ajoutées, {wave_missing} fichiers ignorés (étudiants non reconnus).")
-
-    logger.info(f"🎉 Importation des dictées terminée : {total_added} nouvelles copies ajoutées au total.")
-
-def reset_database(session: Session):
-    """Supprime toutes les données des tables principales."""
+def reset_db(session: Session):
     logger.warning("☢️ Réinitialisation complète de la base de données en cours...")
     try:
-        session.exec(text("TRUNCATE TABLE mistakes, submissions, students, dictations RESTART IDENTITY CASCADE;"))
+        session.exec(text("TRUNCATE TABLE assessment_results, mistakes, submissions, students, dictations RESTART IDENTITY CASCADE;"))
         session.commit()
         logger.info("♻️ Base de données réinitialisée.")
     except Exception as e:
@@ -577,30 +621,43 @@ def reset_database(session: Session):
 def main():
     parser = argparse.ArgumentParser(description="Script d'importation des données initiales.")
     parser.add_argument("--reset-db", action="store_true", help="Réinitialiser la base de données avant l'importation.")
+    parser.add_argument("--dry-run", action="store_true", help="Simuler l'import sans écrire en DB.")
     args = parser.parse_args()
 
-    print_diagnostic()
+    stats = ImportStats()
 
-    logger.info("🚀 Initialisation de la base de données...")
-    init_db()
+    if args.dry_run:
+        logger.info("🔍 Mode DRY RUN activé : aucune modification ne sera apportée à la base de données.")
+    else:
+        logger.info("🚀 Initialisation de la base de données...")
+        init_db()
 
     try:
         with Session(engine) as session:
-            if args.reset_db:
-                reset_database(session)
+            if args.reset_db and not args.dry_run:
+                reset_db(session)
+            
+            student_service = StudentService(session, stats, args.dry_run)
+            if not student_service.uuid_map:
+                logger.error("❌ Arrêt : Mapping UUID vide.")
+                return
 
-            uuid_map = load_uuid_map()
-            if uuid_map:
-                logger.info(f"🔑 {len(uuid_map)} correspondances chargées pour la pseudonymisation.")
-                seed_students(session, uuid_map)
-                seed_results_unified(session, uuid_map)
-                seed_dictation_files(session, uuid_map)
+            student_service.import_survey()
+
+            importer = AssessmentImporter(session, student_service, stats, args.dry_run)
+            importer.import_voltaire()
+            importer.import_ecriplus()
+
+            seed_dictations(session, student_service, stats, args.dry_run)
+
+            if not args.dry_run:
                 session.commit()
-                print("🎉 Importation terminée avec succès !")
-            else:
-                logger.error("❌ Aucune correspondance chargée, l'importation a été annulée pour éviter les incohérences.")
+
+            stats.print_summary(args.dry_run)
     except Exception as e:
-        logger.error(f"❌ Échec de l'importation : {e}")
+        logger.error(f"❌ Erreur critique lors de l'importation : {e}")
+        stats.errors.append(str(e))
+        stats.print_summary(args.dry_run)
         sys.exit(1)
 
 if __name__ == "__main__":

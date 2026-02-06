@@ -34,6 +34,9 @@
 - Pour écraser et tout remettre à propre (reset).
 `docker-compose exec backend python -m app.seed --reset-db`
 
+- Pour tester (simulation).
+`docker-compose exec backend python -m app.seed --dry-run`
+
 ### Script Check Names
 
 - Permet de vérifier la différence entre le nom de la dictée et le nom dans le CSV.
