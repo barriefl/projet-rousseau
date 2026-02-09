@@ -1,4 +1,4 @@
-from backend.app.models import AssessmentResult, AssessmentType, Platform, Student, Submission
+from app.models import AssessmentResult, AssessmentType, Platform, Student, Submission
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -8,20 +8,23 @@ class StatsService:
 
     def get_global_kpis(self):
         """Récupère les indicateurs clés globaux."""
-        total_students = Student.query.count()
+        total_students = self.db.query(Student).count()
 
         # Implémenter la moyenne des scores initiaux et finaux pour les dictées.
         # dictations_avg_init = db.session.query(db.func.avg(Submission.score))\
 
-        voltaire_avg_init = self.db.query(func.avg(AssessmentResult.score))\
-            .filter_by(platform=Platform.VOLTAIRE, assessment_type=AssessmentType.INITIAL).scalar() or 0.0
-        voltaire_avg_final = self.db.query(func.avg(AssessmentResult.score))\
-            .filter_by(platform=Platform.VOLTAIRE, assessment_type=AssessmentType.FINAL).scalar() or 0.0
+        def get_avg_score(a_platform, a_type):
+            result = self.db.query(func.avg(AssessmentResult.score))\
+                .filter(AssessmentResult.platform == a_platform)\
+                .filter(AssessmentResult.type == a_type)\
+                .scalar()
+            return result or 0.0
         
-        ecriplus_avg_init = self.db.query(func.avg(AssessmentResult.score))\
-            .filter_by(platform=Platform.ECRIPLUS, assessment_type=AssessmentType.INITIAL).scalar() or 0.0
-        ecriplus_avg_final = self.db.query(func.avg(AssessmentResult.score))\
-            .filter_by(platform=Platform.ECRIPLUS, assessment_type=AssessmentType.FINAL).scalar() or 0.0
+        voltaire_avg_init = get_avg_score(Platform.VOLTAIRE, AssessmentType.INITIAL)
+        voltaire_avg_final = get_avg_score(Platform.VOLTAIRE, AssessmentType.FINAL)
+
+        ecriplus_avg_init = get_avg_score(Platform.ECRIPLUS, AssessmentType.INITIAL)
+        ecriplus_avg_final = get_avg_score(Platform.ECRIPLUS, AssessmentType.FINAL)
         
         voltaire_progression = voltaire_avg_final - voltaire_avg_init
         ecriplus_progression = ecriplus_avg_final - ecriplus_avg_init
