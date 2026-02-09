@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.database import init_db
 from fastapi.middleware.cors import CORSMiddleware
+from backend.app.services import stats_service
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,3 +38,5 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+app.include_router(stats_service.router, prefix="/api/stats", tags=["Stats"])
