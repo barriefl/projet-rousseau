@@ -140,17 +140,40 @@ def normalize_text(text: str) -> str:
     return " ".join(text.split())
 
 def clean_float(value: str) -> float:
-    """Convertit '0,88', '43 %', '40 %' en float 0.0-1.0."""
-    if not value: 
-        return 0.0
-    v = str(value).replace(",", ".").replace("%", "").strip()
-    try:
-        f = float(v)
-        if f > 1.0: 
+    """
+    Convertit en float normalisé (0.xx).
+    Gère les %, les virgules et les valeurs négatives.
+    Ex: "37%" -> 0.37 | "-4" -> -0.04 | "0,41" -> 0.41
+    """
+    if value is None:
+        return None
+    
+    if isinstance(value, (int, float)):
+        f = float(value)
+        if abs(f) > 1.0:
             return f / 100.0
         return f
+    
+    val_str = str(value).strip()
+
+    if not val_str or val_str.upper() in ["-", "ABS", "N/A", "NON NOTÉ", "None"]:
+        return None
+    
+    has_percent = "%" in val_str
+    
+    clean_str = val_str.replace(",", ".").replace("%", "").strip()
+
+    try:
+        f = float(clean_str)
+        if has_percent:
+            return f/100.0
+
+        if abs(f) > 1.0: 
+            return f / 100.0
+        
+        return f
     except ValueError:
-        return 0.0
+        return None
     
 def get_enum_safe(enum_cls, value: str):
     """Tente de matcher un string avec un Enum (insensible à la casse)."""
@@ -313,7 +336,7 @@ class StudentService:
                                 reading_works=row.get(SURVEY_MAPPING["oeuvres"]),
                                 motive=row.get(SURVEY_MAPPING["motif"]),
                                 appetence_level=row.get(SURVEY_MAPPING["appetence"]),
-                                declared_level=row.get(SURVEY_MAPPING["niveau"]),
+                                declared_level=row.get(SURVEY_MAPPING["niveau_declare"]),
 
                                 parent_1_degree=get_enum_safe(Degree, row.get(SURVEY_MAPPING["p1_dip"])),
                                 parent_1_csp=get_enum_safe(CSP, row.get(SURVEY_MAPPING["p1_csp"])),
@@ -364,6 +387,10 @@ class AssessmentImporter:
     
     def _read_csv_content(self, path: Path) -> List[Dict[str, str]]:
         """Lit un CSV avec détection automatique d'encodage et séparateur."""
+        if not path.exists(): 
+            logger.warning(f"⚠️ Fichier introuvable : {path}")
+            return []
+
         encodings = ['utf-8-sig', 'utf-8', 'cp1252', 'latin-1']
         delimiters = [';', ',', '\t']
         
@@ -386,12 +413,32 @@ class AssessmentImporter:
                     if not dialect: 
                         continue
 
-                    reader = csv.DictReader(f, delimiter=dialect.delimiter)
-                    return list(reader)
+                    reader = csv.reader(f, delimiter=dialect.delimiter)
+
+                    try:
+                        headers = next(reader)
+                    except StopIteration:
+                        logger.warning(f"⚠️ Fichier vide : {path.name}")
+                        return []
+                    
+                    new_headers = []
+                    counts = {}
+
+                    for h in headers:
+                        h_clean = h.strip()
+                        if h_clean in counts:
+                            counts[h_clean] += 1
+                            new_headers.append(f"{h_clean}_{counts[h_clean]}")
+                        else:
+                            counts[h_clean] = 1
+                            new_headers.append(h_clean)
+
+                    return [dict(zip(new_headers, row)) for row in reader]
             except (UnicodeDecodeError, csv.Error):
                 continue
         
-        raise ValueError(f"Impossible de lire le fichier {path.name} (Encodage inconnu).")
+        logger.error(f"❌ Impossible de lire {path.name} (Encodage/Format inconnu).")
+        return []
     
     def _get_col_name(self, headers: List[str], keywords: List[str]) -> Optional[str]:
         """Cherche une colonne correspondant aux mots-clés, en évitant les pièges."""
@@ -436,10 +483,12 @@ class AssessmentImporter:
                 for key, keyword in config["details"].items():
                     if key == "tests_blancs":
                         cols = [h for h in headers if keyword in h.lower()]
-                        if cols: col_details[key] = cols
+                        if cols: 
+                            col_details[key] = cols
                     else:
                         col = find_col_by_keyword(headers, keyword)
-                        if col: col_details[key] = col
+                        if col: 
+                            col_details[key] = col
 
                 col_nom = self._get_col_name(headers, ["nom"])
                 col_prenom = self._get_col_name(headers, ["prénom", "prenom"])
@@ -455,15 +504,24 @@ class AssessmentImporter:
                     score = clean_float(row.get(col_score)) if col_score else 0.0
                     
                     details = {}
-                    for key, col_name in col_details.items():
-                        if key == "tests_blancs":
-                            tests = [clean_float(row.get(c)) for c in col_name if row.get(c)]
+                    for key, col_ref in col_details.items():
+                        if key == "tests_blancs" and isinstance(col_ref, list):
+                            tests = []
+                            for c in col_ref:
+                                val = clean_float(row.get(c))
+                                if val is not None:
+                                    tests.append(val)
                             if tests: 
                                 details[key] = tests
                         else:
-                            val = row.get(col_name)
-                            if val: 
-                                details[key] = val
+                            val = row.get(col_ref)
+                            numeric_fields = ["score", "niveau_atteint", "progres"]
+                            if key in numeric_fields:
+                                clean_val = clean_float(val)
+                                if clean_val is not None:
+                                    details[key] = clean_val
+                            elif val and val.strip(): 
+                                details[key] = val.strip()
 
                     if self._upsert_result(sid, Platform.VOLTAIRE, a_type, score, details):
                         count += 1

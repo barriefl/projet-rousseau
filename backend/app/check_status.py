@@ -5,10 +5,9 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Tuple
 
-# --- CONFIGURATION ---
 DATA_DIR = Path("/data")
 REPORT_DIR = DATA_DIR / "reports"
-REPORT_DIR.mkdir(exist_ok=True) # Crée le dossier s'il n'existe pas
+REPORT_DIR.mkdir(exist_ok=True)
 
 FILES = {
     "SECRET": DATA_DIR / "SECRET_correspondance.csv",
@@ -19,7 +18,6 @@ FILES = {
     "ECRIPLUS_FINAL": DATA_DIR / "results/ecriplus_final.csv"
 }
 
-# --- OUTILS ---
 def normalize(text):
     if not text: return ""
     text = unicodedata.normalize('NFD', text)
@@ -50,12 +48,10 @@ def get_name_cols(headers: List[str]) -> Tuple[str, str]:
         return headers_map["nom"], next((h for h in headers if "prénom" in h.lower() or "prenom" in h.lower()), "Prénom")
     return None, None
 
-# --- MAIN ---
 def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%Hh%M")
     report_file = REPORT_DIR / f"Bilan_Avancement_{timestamp}.txt"
     
-    # Buffer pour stocker le rapport avant écriture
     lines_buffer = []
     
     def log(msg):
@@ -65,7 +61,6 @@ def main():
     log(f"🚀 GÉNÉRATION DU RAPPORT D'AVANCEMENT ({timestamp})")
     log(f"📂 Sortie : {report_file}\n")
 
-    # 1. Initialisation
     students = {}
     rows = read_csv_smart(FILES["SECRET"])
     
@@ -90,7 +85,6 @@ def main():
 
     log(f"✅ {len(students)} étudiants chargés.\n")
 
-    # 2. Vérification Dictées
     for f in FILES["DICTATES_DIR"].rglob("*.txt"):
         if "GRAZIANO" in f.name: continue
         parts = f.stem.split('_')
@@ -101,7 +95,6 @@ def main():
                 if is_final: students[key]["tasks"]["dictee_final"] = True
                 else: students[key]["tasks"]["dictee_init"] = True
 
-    # 3. Vérification CSVs
     targets = [
         ("voltaire_init", FILES["VOLTAIRE_INIT"]),
         ("voltaire_final", FILES["VOLTAIRE_FINAL"]),
@@ -121,9 +114,7 @@ def main():
             key = (normalize(n), normalize(p))
             if key in students: students[key]["tasks"][task_name] = True
 
-    # 4. Génération Tableau
     missing_count = 0
-    # Ajustement largeur colonnes pour emojis
     header = "{:<35} | {:<7} | {:<7} | {:<7} | {:<7} | {:<7} | {:<7}".format(
         "ÉTUDIANT", "D.Init", "D.Fin", "V.Init", "V.Fin", "E.Init", "E.Fin"
     )
@@ -134,10 +125,8 @@ def main():
 
     for key, data in sorted(students.items(), key=lambda x: x[1]['display']):
         t = data["tasks"]
-        # Afficher seulement s'il manque au moins un élément
         if not all(t.values()):
             missing_count += 1
-            # Utilisation de la coche verte demandée
             status = lambda v: "✅" if v else "❌" 
             
             row_str = "{:<35} | {:<7} | {:<7} | {:<7} | {:<7} | {:<7} | {:<7}".format(
@@ -155,9 +144,7 @@ def main():
         log(f"⚠️  {missing_count} étudiants incomplets (sur {len(students)}).")
         log("   (Légende : D=Dictée, V=Voltaire, E=Ecri+)")
 
-    # 5. Écriture Fichier
     try:
-        # Encodage utf-8 obligatoire pour supporter les emojis ✅ et ❌
         with open(report_file, "w", encoding="utf-8") as f:
             f.write("\n".join(lines_buffer))
         print(f"\n✅ Rapport sauvegardé avec succès dans : {report_file}")
