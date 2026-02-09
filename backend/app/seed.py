@@ -299,6 +299,7 @@ class StudentService:
                         uid = uuid.UUID(uuid_str) if uuid_str else uuid.uuid4()
                         
                         if uid in self.student_cache or uid in simulated_uuids:
+                            logger.warning(f"⚠️ DOUBLON DÉTECTÉ ET IGNORÉ : {nom} {prenom}")
                             self.stats.students_skipped += 1
                             continue
 

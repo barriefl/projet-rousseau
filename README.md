@@ -51,3 +51,8 @@
 
 - Permet de voir si les étudiants matchent entre les différents CSV.
 `docker-compose exec backend python -m app.check_mapping`
+
+#### Script Check Status
+
+- Permet de voir l'avancée de chaque étudiant niveau des dictées et résultats outils.
+`docker-compose exec backend python -m app.check_status`

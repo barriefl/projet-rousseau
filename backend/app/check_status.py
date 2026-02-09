@@ -1,0 +1,168 @@
+import csv
+import os
+import unicodedata
+from pathlib import Path
+from datetime import datetime
+from typing import List, Dict, Tuple
+
+# --- CONFIGURATION ---
+DATA_DIR = Path("/data")
+REPORT_DIR = DATA_DIR / "reports"
+REPORT_DIR.mkdir(exist_ok=True) # Crée le dossier s'il n'existe pas
+
+FILES = {
+    "SECRET": DATA_DIR / "SECRET_correspondance.csv",
+    "DICTATES_DIR": DATA_DIR / "dictates",
+    "VOLTAIRE_INIT": DATA_DIR / "results/voltaire_initial.csv",
+    "VOLTAIRE_FINAL": DATA_DIR / "results/voltaire_final.csv",
+    "ECRIPLUS_INIT": DATA_DIR / "results/ecriplus_initial.csv",
+    "ECRIPLUS_FINAL": DATA_DIR / "results/ecriplus_final.csv"
+}
+
+# --- OUTILS ---
+def normalize(text):
+    if not text: return ""
+    text = unicodedata.normalize('NFD', text)
+    text = "".join(c for c in text if unicodedata.category(c) != 'Mn')
+    text = text.strip().lower().replace("-", " ").replace("_", " ")
+    return " ".join(text.split())
+
+def read_csv_smart(path: Path) -> List[Dict[str, str]]:
+    if not path.exists(): return []
+    encodings = ['utf-8-sig', 'cp1252', 'latin-1']
+    for encoding in encodings:
+        try:
+            with open(path, 'r', encoding=encoding) as f:
+                sample = f.read(2048)
+                f.seek(0)
+                try: dialect = csv.Sniffer().sniff(sample, delimiters=[',', ';', '\t'])
+                except: dialect = csv.Dialect; dialect.delimiter = ';' if ';' in sample else ','
+                reader = csv.DictReader(f, delimiter=dialect.delimiter)
+                return list(reader)
+        except: continue
+    return []
+
+def get_name_cols(headers: List[str]) -> Tuple[str, str]:
+    headers_map = {h.lower(): h for h in headers}
+    if "nom du participant" in headers_map:
+        return headers_map["nom du participant"], headers_map.get("prénom du participant", "Prénom du Participant")
+    if "nom" in headers_map:
+        return headers_map["nom"], next((h for h in headers if "prénom" in h.lower() or "prenom" in h.lower()), "Prénom")
+    return None, None
+
+# --- MAIN ---
+def main():
+    timestamp = datetime.now().strftime("%Y-%m-%d_%Hh%M")
+    report_file = REPORT_DIR / f"Bilan_Avancement_{timestamp}.txt"
+    
+    # Buffer pour stocker le rapport avant écriture
+    lines_buffer = []
+    
+    def log(msg):
+        print(msg)
+        lines_buffer.append(msg)
+
+    log(f"🚀 GÉNÉRATION DU RAPPORT D'AVANCEMENT ({timestamp})")
+    log(f"📂 Sortie : {report_file}\n")
+
+    # 1. Initialisation
+    students = {}
+    rows = read_csv_smart(FILES["SECRET"])
+    
+    if not rows:
+        log("❌ Erreur : Impossible de lire SECRET_correspondance.csv")
+        return
+
+    for row in rows:
+        clean = {k.strip().lower(): v for k, v in row.items()}
+        n_raw, p_raw = clean.get("nom"), clean.get("prenom") or clean.get("prénom")
+        
+        if n_raw and p_raw:
+            key = (normalize(n_raw), normalize(p_raw))
+            students[key] = {
+                "display": f"{n_raw} {p_raw}",
+                "tasks": {
+                    "dictee_init": False, "dictee_final": False,
+                    "voltaire_init": False, "voltaire_final": False,
+                    "ecriplus_init": False, "ecriplus_final": False
+                }
+            }
+
+    log(f"✅ {len(students)} étudiants chargés.\n")
+
+    # 2. Vérification Dictées
+    for f in FILES["DICTATES_DIR"].rglob("*.txt"):
+        if "GRAZIANO" in f.name: continue
+        parts = f.stem.split('_')
+        if len(parts) >= 2:
+            key = (normalize(parts[0]), normalize(parts[1]))
+            if key in students:
+                is_final = "final" in f.parent.name.lower() or "final" in f.name.lower()
+                if is_final: students[key]["tasks"]["dictee_final"] = True
+                else: students[key]["tasks"]["dictee_init"] = True
+
+    # 3. Vérification CSVs
+    targets = [
+        ("voltaire_init", FILES["VOLTAIRE_INIT"]),
+        ("voltaire_final", FILES["VOLTAIRE_FINAL"]),
+        ("ecriplus_init", FILES["ECRIPLUS_INIT"]),
+        ("ecriplus_final", FILES["ECRIPLUS_FINAL"]),
+    ]
+
+    for task_name, path in targets:
+        rows = read_csv_smart(path)
+        if not rows: continue
+        col_nom, col_prenom = get_name_cols(list(rows[0].keys()))
+        if not col_nom: continue
+
+        for row in rows:
+            n, p = row.get(col_nom, ""), row.get(col_prenom, "")
+            if not n or not p: continue
+            key = (normalize(n), normalize(p))
+            if key in students: students[key]["tasks"][task_name] = True
+
+    # 4. Génération Tableau
+    missing_count = 0
+    # Ajustement largeur colonnes pour emojis
+    header = "{:<35} | {:<7} | {:<7} | {:<7} | {:<7} | {:<7} | {:<7}".format(
+        "ÉTUDIANT", "D.Init", "D.Fin", "V.Init", "V.Fin", "E.Init", "E.Fin"
+    )
+    separator = "-" * 95
+    
+    log(header)
+    log(separator)
+
+    for key, data in sorted(students.items(), key=lambda x: x[1]['display']):
+        t = data["tasks"]
+        # Afficher seulement s'il manque au moins un élément
+        if not all(t.values()):
+            missing_count += 1
+            # Utilisation de la coche verte demandée
+            status = lambda v: "✅" if v else "❌" 
+            
+            row_str = "{:<35} | {:<7} | {:<7} | {:<7} | {:<7} | {:<7} | {:<7}".format(
+                data["display"][:35],
+                status(t["dictee_init"]), status(t["dictee_final"]),
+                status(t["voltaire_init"]), status(t["voltaire_final"]),
+                status(t["ecriplus_init"]), status(t["ecriplus_final"])
+            )
+            log(row_str)
+
+    log(separator)
+    if missing_count == 0:
+        log("🎉 TOUT EST COMPLET !")
+    else:
+        log(f"⚠️  {missing_count} étudiants incomplets (sur {len(students)}).")
+        log("   (Légende : D=Dictée, V=Voltaire, E=Ecri+)")
+
+    # 5. Écriture Fichier
+    try:
+        # Encodage utf-8 obligatoire pour supporter les emojis ✅ et ❌
+        with open(report_file, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines_buffer))
+        print(f"\n✅ Rapport sauvegardé avec succès dans : {report_file}")
+    except Exception as e:
+        print(f"\n❌ Erreur écriture rapport : {e}")
+
+if __name__ == "__main__":
+    main()
