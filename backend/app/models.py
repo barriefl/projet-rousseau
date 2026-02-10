@@ -40,6 +40,14 @@ class AssessmentType(str, Enum):
     INITIAL = "Initiale"
     FINAL = "Finale"
 
+class Group(str, Enum):
+    G0 = "G0"
+    G1 = "G1"
+    G2 = "G2"
+    G3 = "G3"
+    G4 = "G4"
+    G5 = "G5"
+
 class TimestampMixin(SQLModel):
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -64,7 +72,7 @@ class Student(TimestampMixin, table=True):
         description="UUID unique pour l'anonymisation RGPD."
     )
 
-    td_group: str = Field(index=True, description="Groupe de TD de l'étudiant (ex: INFO1, R&T).")
+    group: Optional[Group] = Field(default=None, index=True, description="Groupe d'étude de l'étudiant (G0-G5).")
 
     appetence_level: Optional[str] = Field(default=None, description="Niveau d'appétence pour la lecture (note de 1 à 5).")
     has_library: Optional[Library] = Field(default=None, description="L'étudiant a-t-il une bibliothèque chez lui ?")
@@ -89,7 +97,7 @@ class Student(TimestampMixin, table=True):
     )
 
     def __repr__(self):
-        return f"<Student id={self.id} group={self.td_group} uuid={self.anonymous_id}>"
+        return f"<Student id={self.id} group={self.group} uuid={self.anonymous_id}>"
 
 class Dictation(TimestampMixin, table=True):
     __tablename__ = "dictations"

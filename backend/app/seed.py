@@ -17,7 +17,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from app.database import engine, init_db
 from app.models import (
-    AssessmentResult, AssessmentType, Platform, Student, Dictation, Submission, Mistake, 
+    AssessmentResult, AssessmentType, Group, Platform, Student, Dictation, Submission, Mistake, 
     CSP, Degree, ReadingSupport, Library
 )
 
@@ -90,7 +90,6 @@ ECRIPLUS_COLS = {
 SURVEY_MAPPING = {
     "nom": "15. nom",
     "prenom": "16. prenom",
-    "td": "17. td",
     "biblio": "14. bibliotheque",
     "support": "4. support",
     "oeuvres": "2. oeuvres",
@@ -213,7 +212,7 @@ class StudentService:
         self.student_cache = {s.anonymous_id: s.id for s in students}
         logger.debug(f"🧠 Cache étudiant mis à jour : {len(self.student_cache)} entrées.")
 
-    def _load_uuid_map(self) -> Dict[Tuple[str, str], str]:
+    def _load_uuid_map(self) -> Dict[Tuple[str, str], Dict[str, str]]:
         """Charge le fichier SECRET_correspondance.csv."""
         mapping = {}
         path = FILES["SECRET"]
@@ -234,8 +233,8 @@ class StudentService:
                         dialect.delimiter = ';' if ';' in sample else ','
 
                     reader = csv.DictReader(f, dialect=dialect)
-
                     headers = [h.lower() for h in reader.fieldnames or []]
+
                     if not any("nom" in h for h in headers):
                         continue
                     
@@ -244,13 +243,16 @@ class StudentService:
                         nom = clean.get("nom")
                         prenom = clean.get("prenom") or clean.get("prénom")
                         uuid_val = clean.get("uuid") or clean.get("uuid4")
+                        group_val = clean.get("groupe") or clean.get("group")
                         
                         if nom and prenom and uuid_val:
+                            data = {"uuid": uuid_val, "group": group_val}
+                            
                             key = (normalize_text(nom), normalize_text(prenom))
-                            mapping[key] = uuid_val
+                            mapping[key] = data
 
                             key = (normalize_text(prenom), normalize_text(nom))
-                            mapping[key] = uuid_val
+                            mapping[key] = data
                     
                     if mapping:
                         logger.info(f"✅ Mapping chargé ({len(mapping)} entrées) avec {encoding} et délimiteur '{dialect.delimiter}'.")
@@ -268,31 +270,31 @@ class StudentService:
         n_nom, n_prenom = normalize_text(nom), normalize_text(prenom)
         
         # Match Exact.
-        uuid_str = self.uuid_map.get((n_nom, n_prenom))
+        student_info = self.uuid_map.get((n_nom, n_prenom))
         
         # Match Inversé (Nom <-> Prénom).
-        if not uuid_str:
-            uuid_str = self.uuid_map.get((n_prenom, n_nom))
+        if not student_info:
+            student_info = self.uuid_map.get((n_prenom, n_nom))
 
         # Match Flou (Fuzzy).
-        if not uuid_str:
+        if not student_info:
             candidates = {f"{k[0]} {k[1]}": k for k in self.uuid_map.keys()}
             target = f"{n_nom} {n_prenom}"
             matches = difflib.get_close_matches(target, candidates.keys(), n=1, cutoff=0.85)
             
             if matches:
                 best_key = candidates[matches[0]]
-                uuid_str = self.uuid_map[best_key]
+                student_info = self.uuid_map[best_key]
                 logger.debug(f"🪄 Correction: {nom} {prenom} -> {best_key}")
 
-        if not uuid_str: 
+        if not student_info: 
             return None
         
         if self.dry_run:
             return 999999
         
         try:
-            target_uuid = uuid.UUID(uuid_str)
+            target_uuid = uuid.UUID(student_info["uuid"])
             return self.student_cache.get(target_uuid)
         except: 
             return None
@@ -320,8 +322,17 @@ class StudentService:
                         prenom = row.get(SURVEY_MAPPING["prenom"])
                         
                         n_nom, n_prenom = normalize_text(nom), normalize_text(prenom)
-                        uuid_str = self.uuid_map.get((n_nom, n_prenom))
-                        uid = uuid.UUID(uuid_str) if uuid_str else uuid.uuid4()
+
+                        student_info = self.uuid_map.get((n_nom, n_prenom))
+
+                        uuid_str = str(uuid.uuid4())
+                        group_str = None
+
+                        if student_info:
+                            uuid_str = student_info["uuid"]
+                            group_str = student_info["group"]
+
+                        uid = uuid.UUID(uuid_str)
                         
                         if uid in self.student_cache or uid in simulated_uuids:
                             logger.warning(f"⚠️ DOUBLON DÉTECTÉ ET IGNORÉ : {nom} {prenom}")
@@ -331,7 +342,7 @@ class StudentService:
                         if not self.dry_run:
                             s = Student(
                                 anonymous_id=uid,
-                                td_group=row.get(SURVEY_MAPPING["td"], "Inconnu"),
+                                group=get_enum_safe(Group, group_str),
 
                                 has_library=get_enum_safe(Library, row.get(SURVEY_MAPPING["biblio"])),
                                 reading_support=get_enum_safe(ReadingSupport, row.get(SURVEY_MAPPING["support"])),
