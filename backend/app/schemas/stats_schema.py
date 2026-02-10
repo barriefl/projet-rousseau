@@ -1,16 +1,19 @@
 from pydantic import BaseModel
 
 class SubmissionsStats(BaseModel):
+    total: int
     avg_init: float
     avg_final: float
     progression: float
 
 class VoltaireStats(BaseModel):
+    total: int
     avg_init: float
     avg_final: float
     progression: float
 
 class EcriPlusStats(BaseModel):
+    total: int
     avg_init: float
     avg_final: float
     progression: float

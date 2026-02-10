@@ -9,6 +9,13 @@ class StatsService:
     def get_global_kpis(self):
         """Récupère les indicateurs clés globaux."""
         total_students = self.db.query(Student).count()
+        total_submissions = self.db.query(Submission).count()
+        total_voltaire_assessments = self.db.query(AssessmentResult)\
+            .filter(AssessmentResult.platform == Platform.VOLTAIRE)\
+            .count()
+        total_ecriplus_assessments = self.db.query(AssessmentResult)\
+            .filter(AssessmentResult.platform == Platform.ECRIPLUS)\
+            .count()
 
         def get_dictation_avg(a_type):
             result = self.db.query(
@@ -46,18 +53,21 @@ class StatsService:
         return {
             "total_students": total_students,
             "submissions": {
-                    "avg_init": round(submissions_avg_init, 2),
-                    "avg_final": round(submissions_avg_final, 2),
-                    "progression": round(submissions_progression, 2)
+                "total": total_submissions,
+                "avg_init": round(submissions_avg_init, 2),
+                "avg_final": round(submissions_avg_final, 2),
+                "progression": round(submissions_progression, 2)
             },
             "voltaire": {
-                    "avg_init": round(voltaire_avg_init, 2),
-                    "avg_final": round(voltaire_avg_final, 2),
-                    "progression": round(voltaire_progression, 2)
+                "total": total_voltaire_assessments,
+                "avg_init": round(voltaire_avg_init, 2),
+                "avg_final": round(voltaire_avg_final, 2),
+                "progression": round(voltaire_progression, 2)
             },
             "ecriplus": {
-                    "avg_init": round(ecriplus_avg_init, 2),
-                    "avg_final": round(ecriplus_avg_final, 2),
-                    "progression": round(ecriplus_progression, 2)
+                "total": total_ecriplus_assessments,
+                "avg_init": round(ecriplus_avg_init, 2),
+                "avg_final": round(ecriplus_avg_final, 2),
+                "progression": round(ecriplus_progression, 2)
             }
         }
