@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.services.stats_service import StatsService
 from app.database import get_session
-from app.schemas.stats_schema import GlobalStatsResponse
+from app.schemas.stats_schema import GlobalStatsResponse, GroupStatsResponse
 import logging
 
 router = APIRouter()
@@ -22,3 +22,7 @@ def read_global_stats(service: StatsService = Depends(get_stats_service)):
     except Exception as e:
         logger.error(f"CRASH STATS: {e}")
         raise HTTPException(status_code=500, detail="Impossible de récupérer les statistiques.")
+    
+@router.get("/groups", response_model=GroupStatsResponse)
+def read_group_stats(service: StatsService = Depends(get_stats_service)):
+    return service.get_group_stats()
