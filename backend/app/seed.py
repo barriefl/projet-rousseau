@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from tqdm import tqdm
 from sqlmodel import Session, select, text
+from sqlmodel import SQLModel
+from app.database import engine
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -370,14 +372,14 @@ class AssessmentImporter:
         existing = self.session.exec(select(AssessmentResult).where(
             AssessmentResult.student_id == sid,
             AssessmentResult.platform == platform,
-            AssessmentResult.type == a_type
+            AssessmentResult.assessment_type == a_type
         )).first()
 
         if not existing:
             res = AssessmentResult(
                 student_id=sid,
                 platform=platform,
-                type=a_type,
+                assessment_type=a_type,
                 score=score,
                 details=details
             )
@@ -607,9 +609,12 @@ def seed_dictations(session: Session, student_service: StudentService, stats: Im
     except:
         ref_txt = FILES["TEACHER"].read_text(encoding="latin-1").strip()
 
-    waves = [("data-initial", "Initiale"), ("data-final", "Finale")]
+    waves = [
+        ("data-initial", "Initiale", AssessmentType.INITIAL), 
+        ("data-final", "Finale", AssessmentType.FINAL)
+    ]
 
-    for folder, suffix in waves:
+    for folder, suffix, assessment_type in waves:
         wave_dir = DICTATES_DIR / folder
         if not wave_dir.exists(): 
             continue
@@ -651,6 +656,7 @@ def seed_dictations(session: Session, student_service: StudentService, stats: Im
                             student_id=sid, 
                             dictation_id=dictation_id, 
                             content_student=content, 
+                            assessment_type=assessment_type,
                             scores={}
                         )
                         session.add(sub)
@@ -669,8 +675,11 @@ def seed_dictations(session: Session, student_service: StudentService, stats: Im
 def reset_db(session: Session):
     logger.warning("☢️ Réinitialisation complète de la base de données en cours...")
     try:
-        session.exec(text("TRUNCATE TABLE assessment_results, mistakes, submissions, students, dictations RESTART IDENTITY CASCADE;"))
+        session.exec(text("DROP SCHEMA public CASCADE;"))
+        session.exec(text("CREATE SCHEMA public;"))
+        session.exec(text("GRANT ALL ON SCHEMA public TO rousseau;"))
         session.commit()
+        SQLModel.metadata.create_all(engine)
         logger.info("♻️ Base de données réinitialisée.")
     except Exception as e:
         logger.error(f"❌ Échec de la réinitialisation de la base de données : {e}")

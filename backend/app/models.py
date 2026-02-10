@@ -117,8 +117,8 @@ class Submission(TimestampMixin, table=True):
     student_id: int = Field(foreign_key="students.id")
     dictation_id: int = Field(foreign_key="dictations.id")
 
+    assessment_type: AssessmentType
     content_student: str = Field(description="Texte soumis par l'étudiant.")
-    date_submitted: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Date de soumission de la dictée par l'étudiant.")
     scores: Dict = Field(
         default={}, 
         sa_column=Column(JSON),
@@ -132,7 +132,7 @@ class Submission(TimestampMixin, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
 
-class Mistake(SQLModel, table=True):
+class Mistake(TimestampMixin, table=True):
     __tablename__ = "mistakes"
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -149,14 +149,14 @@ class Mistake(SQLModel, table=True):
 
     submission: Submission = Relationship(back_populates="mistakes")
 
-class AssessmentResult(SQLModel, table=True):
+class AssessmentResult(TimestampMixin, table=True):
     __tablename__ = "assessment_results"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     student_id: int = Field(foreign_key="students.id")
 
     platform: Platform
-    type: AssessmentType
+    assessment_type: AssessmentType
 
     score: float = Field(default=0.0)
 
