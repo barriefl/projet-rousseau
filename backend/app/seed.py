@@ -30,6 +30,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# --- CONFIGURATION. ---
+
 BASE_DIR = Path(__file__).parent.parent.parent
 DATA_DIR = Path(os.getenv("DATA_DIR", BASE_DIR / "data"))
 DICTATES_DIR = DATA_DIR / "dictates"
@@ -102,9 +104,8 @@ SURVEY_MAPPING = {
     "p2_csp": "13. CSP_parent2"
 }
 
-# FILENAME_PATTERN = re.compile(r'^(?P<nom>[^_]+)_(?P<prenom>[^_]+)(?:_.*)?\.txt$')
+# --- STATISTIQUES. ---
 
-# Stats.
 @dataclass
 class ImportStats:
     students_created: int = 0
@@ -132,7 +133,8 @@ class ImportStats:
             print("✅ AUCUNE ERREUR DÉTECTÉE.")
         print("="*40 + "\n")
 
-# Fonctions (helpers).
+# --- FONCTIONS UTILITAIRES. ---
+
 def normalize_text(text: str) -> str:
     """Nettoyage standard des chaînes (minuscule, sans accents/espaces superflus)."""
     if not text: 
@@ -194,7 +196,8 @@ def find_col_by_keyword(headers: List[str], keyword: str) -> Optional[str]:
             return h
     return None
 
-# Services Métier.
+# --- SERVICES MÉTIERS. ---
+
 class StudentService:
     def __init__(self, session: Session, stats: ImportStats, dry_run: bool = False):
         self.session = session
@@ -324,6 +327,10 @@ class StudentService:
                         n_nom, n_prenom = normalize_text(nom), normalize_text(prenom)
 
                         student_info = self.uuid_map.get((n_nom, n_prenom))
+
+                        if not student_info:
+                            logger.info(f"⛔ Ignoré (Pas dans Secret) : {nom} {prenom}")
+                            continue
 
                         uuid_str = str(uuid.uuid4())
                         group_str = None
@@ -681,7 +688,7 @@ def seed_dictations(session: Session, student_service: StudentService, stats: Im
             session.commit()
         stats.dictations_imported += count
 
-# Main.
+# --- MAIN. ---
 
 def reset_db(session: Session):
     logger.warning("☢️ Réinitialisation complète de la base de données en cours...")
