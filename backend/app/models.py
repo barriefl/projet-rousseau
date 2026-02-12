@@ -146,7 +146,7 @@ class Submission(TimestampMixin, table=True):
 
     assessment_type: AssessmentType
     content_student: str = Field(description="Texte soumis par l'étudiant.")
-    final_score: float = Field(default=0.0, index=True, description="Note sur 20 du texte de l'étudiant.")
+    final_score: float = Field(default=0.0, index=True, description="Total des pénalités (ex : 0 = parfait).")
     scores: Dict = Field(
         default={}, 
         sa_column=Column(JSON),

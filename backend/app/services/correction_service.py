@@ -206,18 +206,22 @@ class CorrectionService:
         total_penalty = 0.0
         scores_breakdown = {}
 
+        code_to_name = {s.code: s.name for s in self.scales}
+
         for m in all_mistakes:
             total_penalty += m.malus_applied
 
             code = m.category_code
-            if code not in scores_breakdown:
-                scores_breakdown[code] = 0.0
+            category_name = code_to_name.get(code, code)
+
+            if category_name not in scores_breakdown:
+                scores_breakdown[category_name] = 0.0
             
-            scores_breakdown[code] += m.malus_applied
+            scores_breakdown[category_name] += m.malus_applied
 
         scores_breakdown = {k: round(v, 2) for k, v in scores_breakdown.items()}
 
-        submission.final_score = round(max(0.0, 20.0 - total_penalty), 2)
+        submission.final_score = round(total_penalty, 2)
         
         submission.scores = scores_breakdown
         
