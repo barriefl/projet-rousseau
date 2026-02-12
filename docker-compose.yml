@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -82,6 +82,16 @@ services:
         limits:
           cpus: '0.5'
           memory: 512M
+  
+  languagetool:
+    image: meyay/languagetool
+    container_name: rousseau-languagetool
+    ports:
+      - "8010:8081"
+    environment:
+      - Java_Xms=256m
+      - Java_Xmx=512m
+      - JAVA_TOOL_OPTIONS=-Djava.net.preferIPv4Stack=true
 
 volumes:
   postgres_data:

@@ -1,6 +1,7 @@
 import csv
 from dataclasses import dataclass, field
 import difflib
+import socket
 import sys
 import os
 import uuid
@@ -12,12 +13,15 @@ from tqdm import tqdm
 from sqlmodel import Session, select, text
 from sqlmodel import SQLModel
 from app.database import engine
+from app.services.correction_service import CorrectionService
+
+os.environ['NO_PROXY'] = '127.0.0.1,localhost'
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from app.database import engine, init_db
 from app.models import (
-    AssessmentResult, AssessmentType, Group, Platform, Student, Dictation, Submission, Mistake, 
+    AssessmentResult, AssessmentType, GradingScale, Group, MistakeType, Platform, Student, Dictation, Submission, Mistake, 
     CSP, Degree, ReadingSupport, Library
 )
 
@@ -616,11 +620,104 @@ class AssessmentImporter:
                 self.stats.ecriplus_imported += count
             except Exception as e:
                 self.stats.errors.append(f"Erreur Ecri+ {path.name}: {e}")
+
+def seed_grading_scales(session: Session, stats: ImportStats, dry_run: bool):
+    """Initialise les barèmes de correction Rousseau."""
+    if dry_run:
+        return
+
+    scales_data = [
+        {
+            "code": "1",
+            "name": "Fautes de frappe ou erreur sur les lettres muettes", 
+            "description": "Substitutions, omissions, ajouts de lettres ou de mots.",
+            "type_rousseau": MistakeType.D,
+            "penalty": 0.5,
+            "lt_rule_patterns": "misspelling,typo"
+        },
+        {
+            "code":"2",
+            "name": "Erreurs d'accents et de cédilles", 
+            "description": "Absence ou mauvaises utilisation des accents (ex : é/è/ê), absence ou mauvaise utilisation de la cédille (ex : ç).",
+            "type_rousseau": MistakeType.R,
+            "penalty": 1.0,
+            "lt_rule_patterns": "accent,cedille"
+        },
+        {
+            "code": "3",
+            "name": "Erreurs de doublement", 
+            "description": "Doubles consonnes ou voyelles manquantes ou superflues.",
+            "type_rousseau": MistakeType.D,
+            "penalty": 0.5,
+            "lt_rule_patterns": "double"
+        },
+        {
+            "code": "4",
+            "name": "Confusions homophoniques", 
+            "description": "Confondre des mots qui se prononcent de la même manière mais s'écrivent différemment (ex : a/à, et/est, ses/ces/s'est/c'est, mais/mes).",
+            "type_rousseau": MistakeType.S,
+            "penalty": 1.0,
+            "lt_rule_patterns": "homophone,confused_words"
+        },
+        {
+            "code": "5",
+            "name": "Erreurs de terminaison", 
+            "description": "Mauvaise conjugaison des verbes, mauvaise formation  des adjectifs et des participes passés.",
+            "type_rousseau": MistakeType.R,
+            "penalty": 1.0,
+            "lt_rule_patterns": "grammar,conjugation,agreement"
+        },
+        {
+            "code": "AUTRE",
+            "name": "Autre erreur",
+            "description": "Erreur non classifiée.",
+            "type_rousseau": MistakeType.AUTRE,
+            "penalty": 0.0,
+            "lt_rule_patterns": ""
+        }
+    ]
+
+    count = 0
+    for data in scales_data:
+        existing = session.exec(select(GradingScale).where(GradingScale.code == data["code"])).first()
+
+        if not existing:
+            scale = GradingScale(**data)
+            session.add(scale)
+            count += 1
+        else:
+            existing.name = data["name"]
+            existing.description = data["description"]
+            existing.type_rousseau = data["type_rousseau"]
+            existing.penalty = data["penalty"]
+            existing.lt_rule_patterns = data["lt_rule_patterns"]
+            session.add(existing)
+
+    if not dry_run:
+        session.commit()
+        logger.info(f"📏 Barèmes : {count} règles créées ou mises à jour.")
     
 def seed_dictations(session: Session, student_service: StudentService, stats: ImportStats, dry_run: bool):
     """Import des dictées (par vague)."""
     if not DICTATES_DIR.exists(): return
     if not FILES["TEACHER"].exists(): return
+
+    lt_host_docker = "languagetool"
+    lt_host_windows = "host.docker.internal"
+    try:
+        socket.gethostbyname(lt_host_docker)
+        lt_url = f"http://{lt_host_docker}:8081/v2/check"
+        print(f"🐳 Mode Docker Network : {lt_url}")
+    except socket.gaierror:
+        try:
+            socket.gethostbyname(lt_host_windows)
+            lt_url = f"http://{lt_host_windows}:8010/v2/check"
+            print(f"🪟 Mode Pont Windows : {lt_url}")
+        except socket.gaierror:
+            lt_url = "http://127.0.0.1:8010/v2/check"
+            print(f"💻 Mode Localhost : {lt_url}")
+
+    correction_service = CorrectionService(session, lt_url=lt_url)
 
     try:
         ref_txt = FILES["TEACHER"].read_text(encoding="utf-8").strip()
@@ -643,7 +740,13 @@ def seed_dictations(session: Session, student_service: StudentService, stats: Im
             title = f"Dictées Étude Rousseau ({suffix})"
             dictation = session.exec(select(Dictation).where(Dictation.title == title)).first()
             if not dictation:
-                dictation = Dictation(title=title, content_reference=ref_txt, rules_config={"DEFAULT": 1.0})
+                default_rules = {s.code: s.penalty for s in session.exec(select(GradingScale)).all()}
+
+                dictation = Dictation(
+                    title=title, 
+                    content_reference=ref_txt, 
+                    rules_config=default_rules
+                )
                 session.add(dictation)
                 session.commit()
                 session.refresh(dictation)
@@ -670,6 +773,7 @@ def seed_dictations(session: Session, student_service: StudentService, stats: Im
                 if not dry_run:
                     try:
                         content = f.read_text(encoding='utf-8', errors='ignore').strip()
+
                         sub = Submission(
                             student_id=sid, 
                             dictation_id=dictation_id, 
@@ -678,6 +782,8 @@ def seed_dictations(session: Session, student_service: StudentService, stats: Im
                             scores={}
                         )
                         session.add(sub)
+                        session.flush()
+                        correction_service.correct_submission(sub)
                         count += 1
                     except Exception as e: 
                         stats.errors.append(f"Erreur dictée {f.name}: {e}")
@@ -734,6 +840,7 @@ def main():
             importer.import_voltaire()
             importer.import_ecriplus()
 
+            seed_grading_scales(session, stats, args.dry_run)
             seed_dictations(session, student_service, stats, args.dry_run)
 
             if not args.dry_run:

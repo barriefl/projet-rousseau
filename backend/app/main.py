@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.database import init_db
 from fastapi.middleware.cors import CORSMiddleware
-from app.endpoints import stats_endpoint
+from app.endpoints import stats_endpoint, submissions_endpoint
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -40,3 +40,4 @@ def health_check():
     return {"status": "healthy"}
 
 app.include_router(stats_endpoint.router, prefix="/api/stats", tags=["Stats"])
+app.include_router(submissions_endpoint.router, prefix="/api/corrections", tags=["Corrections"])

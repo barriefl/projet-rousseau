@@ -48,6 +48,12 @@ class Group(str, Enum):
     G4 = "G4"
     G5 = "G5"
 
+class MistakeType(str, Enum):
+    D = "D"
+    S = "S"
+    R = "R"
+    AUTRE = "A"
+
 class TimestampMixin(SQLModel):
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -87,7 +93,7 @@ class Student(TimestampMixin, table=True):
 
     declared_level: Optional[str] = Field(default=None, description="Niveau déclaré par l'étudiant.")
 
-    submissions: list["Submission"] = Relationship(
+    submissions: List["Submission"] = Relationship(
         back_populates="student",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
@@ -113,10 +119,23 @@ class Dictation(TimestampMixin, table=True):
     title: str
     content_reference: str = Field(description="Texte de référence de la dictée.")
 
-    submissions: list["Submission"] = Relationship(
+    submissions: List["Submission"] = Relationship(
         back_populates="dictation",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
+
+class GradingScale(TimestampMixin, table=True):
+    __tablename__ = "grading_scales"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    code: str = Field(unique=True)
+    name: str
+    description: str
+    type_rousseau: MistakeType
+    penalty: float = Field(default=1.0)
+
+    lt_rule_patterns: Optional[str] = Field(default=None, description="Mots clés des règles LanguageTool associés, séparés par virgule.")
 
 class Submission(TimestampMixin, table=True):
     __tablename__ = "submissions"
@@ -127,15 +146,16 @@ class Submission(TimestampMixin, table=True):
 
     assessment_type: AssessmentType
     content_student: str = Field(description="Texte soumis par l'étudiant.")
+    final_score: float = Field(default=0.0, index=True, description="Note sur 20 du texte de l'étudiant.")
     scores: Dict = Field(
         default={}, 
         sa_column=Column(JSON),
-        description="Scores détaillés. Ex: {'raw': 10, 'final': 15/20}."
+        description="Scores détaillés. Ex: {'orthographe': 5, 'grammaire': 10}."
     )
 
     student: Student = Relationship(back_populates="submissions")
     dictation: Dictation = Relationship(back_populates="submissions")
-    mistakes: list["Mistake"] = Relationship(
+    mistakes: List["Mistake"] = Relationship(
         back_populates="submission",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
@@ -149,11 +169,15 @@ class Mistake(TimestampMixin, table=True):
     student_word: str
     correct_word: str
     position_index: int = Field(description="Index de position du mot dans le texte (pour le surlignage).")
-    category: str
-    type_rousseau: str = Field(description="Type de faute selon la typologie demandée (D : dessin graphique du mot, S : sens, R : règle de grammaire ou de conjugaison).")
-    rule_id: str
+    length: int
+
+    category_code: str
+    type_rousseau: MistakeType = Field(description="Type de faute selon la typologie demandée (D : dessin graphique du mot, S : sens, R : règle de grammaire ou de conjugaison).")
+    malus_applied: float
+
+    rule_id_lt: str
+    message: str
     context: str
-    malus: float
 
     submission: Submission = Relationship(back_populates="mistakes")
 
