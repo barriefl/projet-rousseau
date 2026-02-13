@@ -93,6 +93,17 @@ services:
       - Java_Xmx=512m
       - JAVA_TOOL_OPTIONS=-Djava.net.preferIPv4Stack=true
 
+  frontend:
+    build:
+      context: ./frontend
+    container_name: rousseau_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - rousseau_net
+
 volumes:
   postgres_data:
 
