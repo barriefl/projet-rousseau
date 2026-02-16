@@ -24,6 +24,7 @@ from app.models import (
     AssessmentResult, AssessmentType, GradingScale, Group, MistakeType, Platform, Student, Dictation, Submission, Mistake, 
     CSP, Degree, ReadingSupport, Library
 )
+from app.utils.crypto import encrypt_text
 
 logging.basicConfig(
     level=logging.INFO,
@@ -251,9 +252,16 @@ class StudentService:
                         prenom = clean.get("prenom") or clean.get("prénom")
                         uuid_val = clean.get("uuid") or clean.get("uuid4")
                         group_val = clean.get("groupe") or clean.get("group")
+                        promo_val = clean.get("promo")
                         
                         if nom and prenom and uuid_val:
-                            data = {"uuid": uuid_val, "group": group_val}
+                            data = {
+                                "uuid": uuid_val, 
+                                "group": group_val,
+                                "promo": promo_val,
+                                "nom": nom,
+                                "prenom": prenom
+                            }
                             
                             key = (normalize_text(nom), normalize_text(prenom))
                             mapping[key] = data
@@ -338,10 +346,16 @@ class StudentService:
 
                         uuid_str = str(uuid.uuid4())
                         group_str = None
+                        promo_str = None
+                        secret_nom = nom
+                        secret_prenom = prenom
 
                         if student_info:
                             uuid_str = student_info["uuid"]
                             group_str = student_info["group"]
+                            promo_str = student_info.get("promo")
+                            secret_nom = student_info.get("nom", nom)
+                            secret_prenom = student_info.get("prenom", prenom)
 
                         uid = uuid.UUID(uuid_str)
                         
@@ -353,6 +367,10 @@ class StudentService:
                         if not self.dry_run:
                             s = Student(
                                 anonymous_id=uid,
+
+                                first_name_encrypted=encrypt_text(secret_prenom),
+                                last_name_encrypted=encrypt_text(secret_nom),
+                                promo=promo_str,
                                 group=get_enum_safe(Group, group_str),
 
                                 has_library=get_enum_safe(Library, row.get(SURVEY_MAPPING["biblio"])),

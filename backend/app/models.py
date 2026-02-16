@@ -78,6 +78,9 @@ class Student(TimestampMixin, table=True):
         description="UUID unique pour l'anonymisation RGPD."
     )
 
+    first_name_encrypted: str | None = Field(default=None, description="Prénom chiffré en AES.")
+    last_name_encrypted: str | None = Field(default=None, description="Nom chiffré en AES.")
+    promo: str | None = Field(default=None, description="Ex: 2025 - 2026.")
     group: Optional[Group] = Field(default=None, index=True, description="Groupe d'étude de l'étudiant (G0-G5).")
 
     appetence_level: Optional[str] = Field(default=None, description="Niveau d'appétence pour la lecture (note de 1 à 5).")
