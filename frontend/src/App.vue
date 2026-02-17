@@ -1,60 +1,139 @@
-<script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-</script>
-
 <template>
-  <div class="app-container">
-    <header>
-      <div class="logo">Projet Rousseau</div>
-      <nav>
-        <RouterLink to="/">📊 Dashboard</RouterLink>
-        <RouterLink to="/correction">✍️ Correction</RouterLink>
-      </nav>
-    </header>
+  <div class="app-layout">
+    <nav class="sidebar">
+      <div class="logo">Projet <span>Rousseau</span></div>
+      
+      <RouterLink to="/" class="nav-item" active-class="active">
+        <div>📊 Étude Rousseau</div>
+      </RouterLink>
+      
+      <div class="nav-item emile-menu" :class="{ 'active': isEmileOpen }">
+        <RouterLink to="/emile" style="text-decoration: none; color: inherit; flex: 1;">
+          <div>📝 É.M.I.L.E.</div>
+        </RouterLink>
+        <span style="font-size: 0.8rem; cursor: pointer; padding: 5px;" @click="toggleEmileMenu">
+          {{ isEmileOpen ? '▲' : '▼' }}
+        </span>
+      </div>
+      
+      <div class="sub-nav" :class="{ 'open': isEmileOpen }">
+        <RouterLink to="/gestion" class="sub-nav-item" active-class="active">📂 Gestion des dictées</RouterLink>
+        <RouterLink to="/analyse" class="sub-nav-item" active-class="active">📈 Analyse des travaux</RouterLink>
+        <RouterLink to="/regles" class="sub-nav-item" active-class="active">⚙️ Typologies & Règles</RouterLink>
+      </div>
 
-    <main>
+      <RouterLink to="/etudiants" class="nav-item" active-class="active">
+        <div>🎓 Liste des Étudiants</div>
+      </RouterLink>
+    </nav>
+
+    <main class="main-content">
       <RouterView />
     </main>
   </div>
 </template>
 
+<script setup lang="ts">
+import { ref } from 'vue';
+import { RouterLink, RouterView, useRoute } from 'vue-router';
+
+const isEmileOpen = ref(true);
+
+const toggleEmileMenu = () => {
+  isEmileOpen.value = !isEmileOpen.value;
+};
+</script>
+
 <style scoped>
-header {
+.app-layout {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
-  background-color: #fff;
-  border-bottom: 1px solid #e0e0e0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  height: 100vh;
 }
 
-.logo {
-  font-weight: 900;
-  font-size: 1.2rem;
-  color: #2c3e50;
+/* --- SIDEBAR. --- */
+.sidebar { 
+  min-width: 260px; 
+  background-color: var(--primary); 
+  color: white; 
+  display: flex; 
+  flex-direction: column; 
+  padding: 20px; 
+  z-index: 10; 
+  overflow-y: auto;
 }
 
-nav a {
-  margin-left: 20px;
-  text-decoration: none;
-  color: #57606a;
+.logo { 
+  font-size: 1.4rem; 
+  font-weight: bold; 
+  margin-bottom: 30px; 
+  border-bottom: 1px solid var(--secondary); 
+  padding-bottom: 15px; 
+}
+
+.logo span { 
+  color: var(--accent); 
+}
+
+.nav-item { 
+  padding: 12px 15px; 
+  cursor: pointer; 
+  border-radius: 6px; 
+  margin-bottom: 5px; 
+  transition: 0.2s; 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  gap: 10px; 
   font-weight: 500;
-  transition: color 0.2s;
+  text-decoration: none;
+  color: white;
 }
 
-nav a:hover {
-  color: #42b883; /* Vert Vue.js */
+.nav-item:hover, .nav-item.active { 
+  background-color: var(--secondary); 
+  border-left: 4px solid var(--accent); 
 }
 
-nav a.router-link-active {
-  color: #42b883;
-  font-weight: bold;
+.emile-menu {
+  user-select: none;
 }
 
-main {
-  padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
+/* --- SOUS-MENU. --- */
+.sub-nav { 
+  display: none; 
+  flex-direction: column; 
+  margin-left: 15px; 
+  margin-bottom: 10px; 
+  border-left: 2px solid var(--secondary); 
+  padding-left: 10px;
+}
+
+.sub-nav.open { 
+  display: flex; 
+}
+
+.sub-nav-item { 
+  padding: 10px 15px; 
+  cursor: pointer; 
+  border-radius: 6px; 
+  margin-bottom: 2px; 
+  transition: 0.2s; 
+  font-size: 0.9rem; 
+  color: #bdc3c7;
+  text-decoration: none;
+}
+
+.sub-nav-item:hover, .sub-nav-item.active { 
+  background-color: var(--secondary); 
+  color: white;
+}
+
+/* --- CONTENU PRINCIPAL. --- */
+.main-content { 
+  flex: 1; 
+  padding: 30px; 
+  overflow-y: auto; 
+  height: 100vh; 
+  position: relative;
 }
 </style>
