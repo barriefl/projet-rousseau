@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, HTTPException, status, Depends
 from sqlmodel import Session, select
 from typing import List
 
@@ -7,7 +7,9 @@ from app.models import Student
 from app.schemas.students_schema import StudentResponse
 from app.utils.crypto import decrypt_text
 
-router = APIRouter(prefix="/api/students", tags=["Students"])
+import uuid
+
+router = APIRouter()
 
 @router.get("/", response_model=List[StudentResponse])
 def get_students(session: Session = Depends(get_session)):
@@ -32,3 +34,21 @@ def get_students(session: Session = Depends(get_session)):
         })
         
     return result
+
+@router.delete("/{student_uuid}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_student(student_uuid: uuid.UUID, session: Session = Depends(get_session)):
+    """Supprime un étudiant et toutes ses dictées."""
+    
+    statement = select(Student).where(Student.anonymous_id == student_uuid)
+    student = session.exec(statement).first()
+    
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Étudiant introuvable."
+        )
+        
+    session.delete(student)
+    session.commit()
+    
+    return
