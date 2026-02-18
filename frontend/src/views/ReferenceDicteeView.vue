@@ -12,33 +12,107 @@
       
       <div class="form-group">
         <label>Titre de la dictée référente :</label>
-        <input type="text" placeholder="Ex: Dictée Initiale (Septembre 2024)">
+        <input type="text" v-model="dictationTitle" placeholder="Ex: Dictée Initiale (Septembre 2024)">
       </div>
       
       <div class="form-group" style="margin-top: 25px;">
         <label>Le texte de référence parfait :</label>
         
-        <div class="upload-zone">
+        <div class="upload-zone" @click="triggerFileInput">
           <i>📄</i>
-          <h3>Importez le fichier du professeur</h3>
-          <input type="file" style="display: none;" accept=".txt">
+          <h3>Importez le fichier du professeur (.txt)</h3>
+          <p v-if="fileName" style="color: var(--warning); font-weight: bold; margin-top: 10px;">
+            Fichier chargé : {{ fileName }}
+          </p>
+          <input type="file" ref="fileInputRef" style="display: none;" accept=".txt" @change="handleFileUpload">
         </div>
         
         <div class="separator"><span>OU</span></div>
         
-        <textarea rows="10" placeholder="Saisissez la correction parfaite de la dictée ici..."></textarea>
+        <textarea rows="10" v-model="dictationText" placeholder="Saisissez la correction parfaite de la dictée ici..."></textarea>
       </div>
       
       <div class="actions">
-        <button class="btn btn-warning btn-large">Sauvegarder la référence ⭐</button>
+        <button class="btn btn-warning btn-large" @click="submitDictation" :disabled="isSubmitting || !dictationTitle || !dictationText">
+          {{ isSubmitting ? 'Enregistrement...' : 'Sauvegarder la référence ⭐' }}
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import api from '@/services/api';
+
 const router = useRouter();
+
+// --- ÉTATS. ---
+const dictationTitle = ref('');
+const dictationText = ref('');
+const fileName = ref('');
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const isSubmitting = ref(false);
+
+// --- GESTION DU FICHIER (FileReader). ---
+const triggerFileInput = () => {
+  if (fileInputRef.value) {
+    fileInputRef.value.click();
+  }
+};
+
+const handleFileUpload = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+
+  if (!file) return;
+
+  if (file.type !== 'text/plain') {
+    alert("Veuillez importer un fichier texte (.txt)");
+    return;
+  }
+
+  fileName.value = file.name;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    dictationText.value = (e.target?.result as string) || '';
+  };
+  reader.onerror = () => {
+    alert("Erreur lors de la lecture du fichier.");
+  };
+  
+  reader.readAsText(file);
+  
+  target.value = '';
+};
+
+// --- SOUMISSION À L'API. ---
+const submitDictation = async () => {
+  if (!dictationTitle.value.trim() || !dictationText.value.trim()) {
+    alert("Veuillez renseigner un titre et un texte.");
+    return;
+  }
+
+  isSubmitting.value = true;
+
+  try {
+    await api.createDictation({
+      title: dictationTitle.value,
+      content_reference: dictationText.value
+    });
+
+    alert("Dictée de référence enregistrée avec succès !");
+    router.push('/gestion');
+    
+  } catch (error) {
+    console.error("Erreur lors de la création de la dictée :", error);
+    alert("Une erreur est survenue lors de l'enregistrement.");
+  } finally {
+    isSubmitting.value = false;
+  }
+};
 </script>
 
 <style scoped>

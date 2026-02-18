@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { GlobalStats, Submission, CorrectionPayload, Student } from '@/types';
+import type { GlobalStats, Student } from '@/types';
 
 const apiClient = axios.create({
     baseURL: 'http://localhost:8000/api',
@@ -13,11 +13,8 @@ export default {
         return apiClient.get<GlobalStats>('/stats/global');
     },
 
-    submitDictation(payload: CorrectionPayload) {
-        return apiClient.post<Submission>('/corrections/', payload);
-    },
-    getCorrection(submissionId: number) {
-        return apiClient.get<Submission>('/corrections/${submissionId}');
+    createDictation(payload: { title: string; content_reference: string}) {
+        return apiClient.post('/dictations', payload);
     },
 
     getStudents() {
