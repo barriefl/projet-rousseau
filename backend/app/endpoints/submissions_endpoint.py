@@ -1,57 +1,79 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlmodel import Session, select
+from typing import List
+import uuid
+
 from app.database import get_session
 from app.models import Submission, Student, Dictation
-from app.schemas.submission_schema import SubmissionCreate, SubmissionRead
-from app.services.correction_service import CorrectionService
+from app.schemas.submission_schema import SubmissionCreate, SubmissionResponse
 
 router = APIRouter()
 
-@router.post("/", response_model=SubmissionRead, summary="Corriger une dictée.")
-def process_correction(submission_in: SubmissionCreate, db: Session = Depends(get_session)):
-    """
-    Envoie une copie élève, lance la correction (LanguageTool + Diff) et renvoie la note.
-    """
-    student = db.get(Student, submission_in.student_id)
+@router.post("/", response_model=SubmissionResponse, status_code=status.HTTP_201_CREATED)
+def create_submission(sub_in: SubmissionCreate, session: Session = Depends(get_session)):
+    
+    student = session.exec(select(Student).where(Student.anonymous_id == sub_in.student_uuid)).first()
     if not student:
-        raise HTTPException(status_code=404, detail="Étudiant introuvable.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Étudiant introuvable.")
 
-    dictation = db.get(Dictation, submission_in.dictation_id)
+    dictation = session.get(Dictation, sub_in.dictation_id)
     if not dictation:
-        raise HTTPException(status_code=404, detail="Dictée introuvable.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dictée introuvable.")
 
-    submission = Submission(
-        student_id=submission_in.student_id,
-        dictation_id=submission_in.dictation_id,
-        assessment_type=submission_in.assessment_type,
-        content_student=submission_in.content_student,
-        final_score=0.0,
-        scores={}
+    new_submission = Submission(
+        student_id=student.id,
+        dictation_id=dictation.id,
+        assessment_type=sub_in.assessment_type,
+        content_student=sub_in.content_student
     )
     
-    db.add(submission)
-    db.commit()
-    db.refresh(submission)
-
-    service = CorrectionService(db)
+    session.add(new_submission)
+    session.commit()
+    session.refresh(new_submission)
     
-    try:
-        corrected_submission = service.correct_submission(submission)
-        
-        db.add(corrected_submission)
-        db.commit()
-        db.refresh(corrected_submission)
-        
-        return corrected_submission
+    return {
+        "id": new_submission.id,
+        "student_uuid": student.anonymous_id,
+        "dictation_id": new_submission.dictation_id,
+        "assessment_type": new_submission.assessment_type,
+        "content_student": new_submission.content_student,
+        "final_score": new_submission.final_score,
+        "scores": new_submission.scores
+    }
 
-    except Exception as e:
-        print(f"❌ Erreur critique correction : {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur lors de la correction: {str(e)}")
+@router.get("/", response_model=List[SubmissionResponse], status_code=status.HTTP_200_OK)
+def get_all_submissions(session: Session = Depends(get_session)):
+    submissions_db = session.exec(select(Submission)).all()
+    
+    result = []
+    for sub in submissions_db:
+        student_uuid = sub.student.anonymous_id if sub.student else None
+        
+        result.append({
+            "id": sub.id,
+            "student_uuid": student_uuid,
+            "dictation_id": sub.dictation_id,
+            "assessment_type": sub.assessment_type,
+            "content_student": sub.content_student,
+            "final_score": sub.final_score,
+            "scores": sub.scores
+        })
+        
+    return result
 
-@router.get("/{submission_id}", response_model=SubmissionRead, summary="Consulter un résultat.")
-def get_correction_result(submission_id: int, db: Session = Depends(get_session)):
-    """Récupère une copie déjà corrigée."""
-    submission = db.get(Submission, submission_id)
-    if not submission:
-        raise HTTPException(status_code=404, detail="Copie introuvable.")
-    return submission
+@router.get("/{submission_id}", response_model=SubmissionResponse, status_code=status.HTTP_200_OK)
+def get_submission_by_id(submission_id: int, session: Session = Depends(get_session)):
+    sub = session.get(Submission, submission_id)
+    
+    if not sub:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Copie introuvable.")
+        
+    return {
+        "id": sub.id,
+        "student_uuid": sub.student.anonymous_id,
+        "dictation_id": sub.dictation_id,
+        "assessment_type": sub.assessment_type,
+        "content_student": sub.content_student,
+        "final_score": sub.final_score,
+        "scores": sub.scores
+    }

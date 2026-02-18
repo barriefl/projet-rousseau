@@ -1,5 +1,6 @@
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import Session
+from sqlmodel import Session, select
 from app.database import get_session
 from app.models import Dictation
 from app.schemas.dictation_schema import DictationCreate, DictationResponse
@@ -26,3 +27,25 @@ def create_dictation(dictation_in: DictationCreate, session: Session = Depends(g
     session.refresh(new_dictation)
     
     return new_dictation
+
+@router.get("/", response_model=List[DictationResponse], status_code=status.HTTP_200_OK)
+def get_dictations(session: Session = Depends(get_session)):
+    """Récupère la liste de toutes les dictées de référence."""
+    
+    dictations_db = session.exec(select(Dictation)).all()
+    
+    return dictations_db
+
+@router.get("/{dictation_id}", response_model=DictationResponse, status_code=status.HTTP_200_OK)
+def get_dictation_by_id(dictation_id: int, session: Session = Depends(get_session)):
+    """Récupère une dictée de référence spécifique grâce à son ID."""
+    
+    dictation = session.get(Dictation, dictation_id)
+    
+    if not dictation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dictée introuvable."
+        )
+        
+    return dictation

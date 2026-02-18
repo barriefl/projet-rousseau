@@ -51,3 +51,9 @@ export interface Student {
     promo: string;
     group: string;
 }
+
+export interface Dictation {
+  id: number;
+  title: string;
+  content_reference: string;
+}

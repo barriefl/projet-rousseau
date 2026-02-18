@@ -52,3 +52,28 @@ def delete_student(student_uuid: uuid.UUID, session: Session = Depends(get_sessi
     session.commit()
     
     return
+
+@router.get("/{student_uuid}", response_model=StudentResponse, status_code=status.HTTP_200_OK)
+def get_student_by_id(student_uuid: uuid.UUID, session: Session = Depends(get_session)):
+    """Récupère les informations d'un étudiant spécifique via son UUID."""
+    
+    statement = select(Student).where(Student.anonymous_id == student_uuid)
+    student = session.exec(statement).first()
+    
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Étudiant introuvable."
+        )
+        
+    prenom_clair = decrypt_text(student.first_name_encrypted) or "Inconnu"
+    nom_clair = decrypt_text(student.last_name_encrypted) or "Inconnu"
+    groupe_clair = student.group.value if student.group else None
+    
+    return {
+        "id": student.anonymous_id,
+        "first_name": prenom_clair,
+        "last_name": nom_clair,
+        "promo": student.promo,
+        "group": groupe_clair
+    }

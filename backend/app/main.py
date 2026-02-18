@@ -40,6 +40,6 @@ def health_check():
     return {"status": "healthy"}
 
 app.include_router(stats_endpoint.router, prefix="/api/stats", tags=["Stats"])
-app.include_router(submissions_endpoint.router, prefix="/api/corrections", tags=["Corrections"])
+app.include_router(submissions_endpoint.router, prefix="/api/submissions", tags=["Submissions"])
 app.include_router(students_endpoint.router, prefix="/api/students", tags=["Students"])
 app.include_router(dictations_endpoint.router, prefix="/api/dictations", tags=["Dictations"])
