@@ -1,0 +1,34 @@
+from fastapi import APIRouter, Depends
+from sqlmodel import Session, select
+from typing import List
+
+from app.database import get_session
+from app.models import Student
+from app.schemas.students_schema import StudentResponse
+from app.utils.crypto import decrypt_text
+
+router = APIRouter(prefix="/api/students", tags=["Students"])
+
+@router.get("/", response_model=List[StudentResponse])
+def get_students(session: Session = Depends(get_session)):
+    """Récupère la liste de tous les étudiants avec leurs noms déchiffrés."""
+    
+    students_db = session.exec(select(Student)).all()
+    
+    result = []
+    
+    for s in students_db:
+        prenom_clair = decrypt_text(s.first_name_encrypted) or "Inconnu"
+        nom_clair = decrypt_text(s.last_name_encrypted) or "Inconnu"
+        
+        groupe_clair = s.group.value if s.group else None
+        
+        result.append({
+            "id": s.anonymous_id,
+            "first_name": prenom_clair,
+            "last_name": nom_clair,
+            "promo": s.promo,
+            "group": groupe_clair
+        })
+        
+    return result
