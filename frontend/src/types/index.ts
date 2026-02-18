@@ -43,3 +43,11 @@ export interface CorrectionPayload {
     assessment_type: string;
     content_student: string;
 }
+
+export interface Student {
+    id: string;
+    first_name: string;
+    last_name: string;
+    promo: string;
+    group: string;
+}

@@ -1,7 +1,7 @@
 <template>
   <div class="etudiants-view">
     <div class="header">
-      <h1>Annuaire des Étudiants</h1>
+      <h1>Liste des Étudiants</h1>
     </div>
 
     <table>
@@ -14,10 +14,16 @@
         </tr>
       </thead>
       <tbody>
+        <tr v-if="loading">
+          <td colspan="4" style="text-align: center; padding:30px;">
+            ⏳ Chargement des étudiants en cours...
+          </td>
+        </tr>
+
         <tr v-for="student in students" :key="student.id">
-          <td><strong>{{ student.nom }}, {{ student.prenom }}</strong></td>
-          <td>{{ student.promo }}</td>
-          <td>{{ student.groupe }}</td>
+          <td><strong>{{ student.last_name }}, {{ student.first_name }}</strong></td>
+          <td>{{ student.promo || 'Non renseignée'}}</td>
+          <td>{{ student.group || 'Non assigné' }}</td>
           <td style="text-align: right;">
             <button class="btn-danger" @click="deleteStudent(student)">
               Supprimer les données
@@ -36,37 +42,53 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import api from '@/services/api';
+import type { Student } from '@/types';
 
-// --- DONNÉES DE DÉMO. ---
-// Plus tard, faire un api.getStudents() ici.
-const students = ref([
-  { 
-    id: 1, 
-    nom: 'Dupont', 
-    prenom: 'Jean', 
-    promo: 'BUT1 - 2024/2025', 
-    groupe: 'G1 (Auto)' 
-  },
-  { 
-    id: 2, 
-    nom: 'Martin', 
-    prenom: 'Sophie', 
-    promo: 'BUT1 - 2024/2025', 
-    groupe: 'G2 (Jalons)' 
+const students = ref<Student[]>([]);
+const loading = ref(true);
+
+onMounted(async () => {
+  try {
+    const response = await api.getStudents();
+    
+    const sortedStudents = response.data.sort((a, b) => {
+      const compareNom = a.last_name.localeCompare(b.last_name, 'fr');
+      
+      if (compareNom === 0) {
+        return a.first_name.localeCompare(b.first_name, 'fr');
+      }
+      return compareNom;
+    });
+
+    students.value = sortedStudents;
+    
+  } catch (error) {
+    console.error("Erreur API :", error);
+    alert("Impossible de charger la liste des étudiants.");
+  } finally {
+    loading.value = false;
   }
-]);
+});
 
-// --- ACTIONS. ---
-const deleteStudent = (student: any) => {
+const deleteStudent = async (student: Student) => {
   const isConfirmed = confirm(
-    `⚠️ RGPD : Êtes-vous sûr de vouloir supprimer définitivement les données de ${student.prenom} ${student.nom} ?\n\nCette action est irréversible.`
+    `⚠️ RGPD : Êtes-vous sûr de vouloir supprimer définitivement les données de ${student.first_name} ${student.last_name} ?\n\nCette action est irréversible.`
   );
 
   if (isConfirmed) {
-    students.value = students.value.filter(s => s.id !== student.id);
-    
-    // Plus tard : await api.deleteStudent(student.id);
+    try {
+      await api.deleteStudent(student.id);
+
+      students.value = students.value.filter(s => s.id !== student.id);
+      
+      alert(`Les données de ${student.first_name} ${student.last_name} ont été supprimées avec succès.`);
+      
+    } catch (error) {
+      console.error("Erreur lors de la suppression :", error);
+      alert("Une erreur est survenue lors de la suppression de l'étudiant. Vérifiez que la route DELETE existe bien côté serveur.");
+    }
   }
 };
 </script>
