@@ -1,56 +1,63 @@
 <template>
   <div class="emile-workspace">
     <div class="header">
-      <h1>É.M.I.L.E.</h1>
+      <button class="btn btn-outline" style="margin-right: 15px;" @click="router.push('/gestion')">← Retour</button>
+      <h1 style="display: inline-block;">É.M.I.L.E.</h1>
     </div>
 
     <div class="search-container">
       <input type="text" class="search-input" v-model="searchQuery" placeholder="Rechercher un étudiant par nom...">
-      <select class="filter-select">
-        <option value="">Trier par...</option>
-        <option value="name_asc">Nom (A-Z)</option>
-        <option value="score_asc">Score (Croissant)</option>
-        <option value="group">Groupe (G0 - G5)</option>
-      </select>
     </div>
     
-    <div class="student-scroll-list">
+    <div v-if="isLoadingStudents" style="padding: 20px; color: #7f8c8d;">⏳ Chargement des étudiants...</div>
+
+    <div class="student-scroll-list" v-else>
       <div 
-        v-for="student in students" 
+        v-for="student in filteredStudents" 
         :key="student.id"
         class="student-card" 
         :class="{ 'selected': selectedStudent?.id === student.id }"
         @click="selectStudent(student)"
       >
-        <h4 style="color: var(--primary);">{{ student.nom }}, {{ student.prenom }}</h4>
-        <p>{{ student.promo }} - {{ student.groupe }}</p>
+        <h4 style="color: var(--primary); margin: 0 0 5px 0;">{{ student.last_name }} {{ student.first_name }}</h4>
+        <p style="margin: 0; color: #555; font-size: 0.9rem;">{{ student.promo}} - {{ student.group }}</p>
       </div>
     </div>
 
     <div v-if="selectedStudent" class="dictation-selector">
-      <h4 style="margin-bottom: 10px;">Dictées de l'étudiant :</h4>
-      <div>
+      <h4 style="margin-bottom: 15px; color: var(--primary);">Dictées de {{ selectedStudent.last_name}} {{ selectedStudent.first_name }} :</h4>
+      
+      <div v-if="isLoadingSubmissions" style="color: #7f8c8d; font-size: 0.9rem;">Recherche des dictées en cours...</div>
+      
+      <div v-else-if="studentSubmissions.length > 0">
         <button 
+          v-for="sub in studentSubmissions" 
+          :key="sub.id"
           class="dictation-btn" 
-          :class="{ 'active': selectedDictation === 'initiale' }"
-          @click="selectDictation('initiale')"
-        >Dictée Initiale (02/09)</button>
-        <button 
-          class="dictation-btn" 
-          :class="{ 'active': selectedDictation === 'finale' }"
-          @click="selectDictation('finale')"
-        >Dictée Finale (15/11)</button>
+          :class="{ 'active': selectedSubmission?.id === sub.id }"
+          @click="loadSubmissionDetails(sub)"
+        >
+          Dictée {{ sub.assessment_type === 'INITIAL' ? 'Initiale' : 'Finale' }}
+        </button>
+      </div>
+      
+      <div v-else style="color: var(--danger); font-size: 0.9rem; padding: 10px; background: #fff5f5; border-radius: 5px;">
+        Aucune dictée trouvée pour cet étudiant.
       </div>
     </div>
 
-    <div v-if="selectedDictation" class="atelier-container">
+    <div v-if="isLoadingDetails" style="text-align: center; padding: 40px; color: #7f8c8d;">
+      ⏳ Analyse du texte et génération de la correction en cours...
+    </div>
+
+    <div v-else-if="submissionDetails" class="atelier-container">
       
-      <div 
-        class="text-editor" 
-        @mouseover="handleMouseOver" 
-        @mouseout="handleMouseOut"
-      >
-        <div v-html="dictationHtml"></div>
+      <div class="text-editor" @mouseover="handleMouseOver" @mouseout="handleMouseOut">
+        <h3 style="margin-top: 0; color: #7f8c8d; font-size: 1rem; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+          Texte analysé
+        </h3>
+        
+        <div class="content-html" v-html="submissionDetails.html_text"></div>
         
         <div 
           v-show="tooltip.visible" 
@@ -58,114 +65,133 @@
           :style="{ top: tooltip.y + 'px', left: tooltip.x + 'px' }"
         >
           <h5>Type {{ tooltip.type }} <span style="color:#e74c3c">+{{ tooltip.malus }} pt</span></h5>
-          <div class="correction">{{ tooltip.corr }}</div>
+          <div class="correction">{{ tooltip.corr || 'Aucune suggestion' }}</div>
           <div class="desc">{{ tooltip.desc }}</div>
         </div>
       </div>
 
       <div class="panel">
         <div class="score-display">
-          <small style="color: #333; font-size: 0.85rem;">Score de la dictée</small>
-          <span>10.75 pts</span>
-          <small style="color: #7f8c8d; font-size: 0.75rem;">(Accumulation de malus, 0 = Parfait)</small>
+          <small style="color: #333; font-size: 0.85rem;">Total des pénalités</small>
+          <span>{{ submissionDetails.final_score }} pts</span>
+          <small style="color: #7f8c8d; font-size: 0.75rem;">(0 = Parfait)</small>
         </div>
         
-        <h3 style="font-size: 1rem; margin-bottom: 10px;">Liste des erreurs ({{ mistakes.length }})</h3>
+        <h3 style="font-size: 1rem; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+          Bilan des fautes ({{ submissionDetails.mistakes?.length || 0 }})
+        </h3>
+        
+        <div v-if="submissionDetails.scores && Object.keys(submissionDetails.scores).length > 0" style="margin-bottom: 15px; font-size: 0.85rem;">
+          <div v-for="(val, cat) in submissionDetails.scores" :key="cat" style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+            <span style="color: #555;">{{ cat }}</span>
+            <strong style="color: var(--danger);">+{{ val }}</strong>
+          </div>
+        </div>
         
         <div class="error-list">
           <div 
-            v-for="(mistake, index) in visibleMistakes" 
+            v-for="(mistake, index) in submissionDetails.mistakes" 
             :key="index"
             class="error-item" 
             :data-type="mistake.type"
           >
-            <strong>{{ mistake.word }}</strong><br>
-            Correction : {{ mistake.corr }} (+{{ mistake.malus }})
+            <strong>{{ mistake.word || '[Oubli]' }}</strong><br>
+            <span style="color: #555;">Correction : {{ mistake.corr || '-' }} (+{{ mistake.malus }})</span>
           </div>
         </div>
-        
-        <button 
-          v-if="!showAllErrors && mistakes.length > 5" 
-          class="btn btn-outline" 
-          style="margin-top: 10px; width: 100%;" 
-          @click="showAllErrors = true"
-        >
-          Charger plus d'erreurs
-        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import api from '@/services/api';
+import type { Student } from '@/types';
+
+const router = useRouter();
 
 // --- ÉTATS. ---
+const students = ref<Student[]>([]);
 const searchQuery = ref('');
-const selectedStudent = ref<any>(null);
-const selectedDictation = ref<string | null>(null);
-const showAllErrors = ref(false);
+const isLoadingStudents = ref(true);
+const isLoadingSubmissions = ref(false);
+const isLoadingDetails = ref(false);
 
-// État de l'infobulle.
-const tooltip = ref({
-  visible: false,
-  x: 0,
-  y: 0,
-  type: '',
-  malus: '',
-  corr: '',
-  desc: ''
+const selectedStudent = ref<Student | null>(null);
+const studentSubmissions = ref<any[]>([]);
+const selectedSubmission = ref<any>(null);
+const submissionDetails = ref<any>(null);
+
+// --- COMPUTED (Recherche). ---
+const filteredStudents = computed(() => {
+  return students.value.filter(s => 
+    s.last_name.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
+    s.first_name.toLowerCase().includes(searchQuery.value.toLowerCase())
+  );
 });
 
-// --- DONNÉES DE DÉMO. ---
-const students = ref([
-  { id: 1, nom: 'Dupont', prenom: 'Jean', promo: 'BUT1', groupe: 'G1' },
-  { id: 2, nom: 'Martin', prenom: 'Sophie', promo: 'BUT1', groupe: 'G2' }
-]);
+// État de l'infobulle.
+const tooltip = ref({ visible: false, x: 0, y: 0, type: '', malus: '', corr: '', desc: '' });
 
-// Texte avec balises pré-générées (simule le retour de l'API).
-const dictationHtml = ref(`
-  <p>L'impact de l'informatique sur notre société est incontestable. Aujourd'hui, les professionnels <span class="faute" data-type="D" data-corr="couraient" data-malus="1.0" data-desc="Erreur de doublement : consonne superflue.">courraient</span> de grands risques s'ils négligeaient la sécurité de leurs réseaux. Cependant, tout le monde <span class="faute" data-type="S" data-corr="n'est" data-malus="1.5" data-desc="Confusion homophonique probable (s'est/c'est/n'est).">n'est</span> pas conscient des enjeux réels. Lors de mon dernier audit, j'ai vu des <span class="faute" data-type="R" data-corr="étudiants" data-malus="1.0" data-desc="Erreur de terminaison (pluriel manquant).">étudiant</span> faire des erreurs de manipulation basiques.</p>
-  <br>
-  <p>Il est donc crucial d'organiser des formations <span class="faute" data-type="R" data-corr="dédiées" data-malus="1.0" data-desc="Erreur de terminaison (accord adjectif).">dédiée</span> <span class="faute" data-type="R" data-corr="à" data-malus="0.5" data-desc="Absence d'accent grave.">a</span> ce sujet très spécifique. Beaucoup de collaborateurs <span class="faute" data-type="S" data-corr="ont" data-malus="1.5" data-desc="Confusion homophonique (ont/on).">on</span> l'impression que le piratage n'arrive qu'aux autres. Nous devons <span class="faute" data-type="R" data-corr="sensibiliser" data-malus="1.0" data-desc="Mauvaise conjugaison (infinitif requis).">sensibilisé</span> le public. C'est un <span class="faute" data-type="AUTRE" data-corr="véritable" data-malus="0.25" data-desc="Mot inconnu / Erreur non classifiée.">véritabl</span> défi.</p>
-`);
-
-// Liste des erreurs pour le panneau latéral.
-const mistakes = ref([
-  { word: 'courraient', corr: 'couraient', malus: 1.0, type: 'D' },
-  { word: 'n\'est', corr: 'n\'est', malus: 1.5, type: 'S' },
-  { word: 'étudiant', corr: 'étudiants', malus: 1.0, type: 'R' },
-  { word: 'dédiée', corr: 'dédiées', malus: 1.0, type: 'R' },
-  { word: 'a', corr: 'à', malus: 0.5, type: 'R' },
-  { word: 'on', corr: 'ont', malus: 1.5, type: 'S' },
-  { word: 'sensibilisé', corr: 'sensibiliser', malus: 1.0, type: 'R' },
-  { word: 'véritabl', corr: 'véritable', malus: 0.25, type: 'AUTRE' }
-]);
-
-const visibleMistakes = computed(() => showAllErrors.value ? mistakes.value : mistakes.value.slice(0, 5));
+// --- CHARGEMENT INITIAL. ---
+onMounted(async () => {
+  try {
+    const res = await api.getStudents();
+    students.value = res.data.sort((a: Student, b: Student) => a.last_name.localeCompare(b.last_name, 'fr'));
+  } catch (error) {
+    console.error("Erreur chargement étudiants :", error);
+  } finally {
+    isLoadingStudents.value = false;
+  }
+});
 
 // --- ACTIONS. ---
-const selectStudent = (student: any) => {
+
+const selectStudent = async (student: Student) => {
   selectedStudent.value = student;
-  selectedDictation.value = null;
+  selectedSubmission.value = null;
+  submissionDetails.value = null;
+  studentSubmissions.value = [];
+  isLoadingSubmissions.value = true;
+
+  try {
+    const res = await api.getStudentSubmissions(student.id);
+    studentSubmissions.value = res.data;
+  } catch (error) {
+    console.error("Erreur dictées :", error);
+  } finally {
+    isLoadingSubmissions.value = false;
+  }
 };
 
-const selectDictation = (type: string) => {
-  selectedDictation.value = type;
-  showAllErrors.value = false;
+const loadSubmissionDetails = async (sub: any) => {
+  selectedSubmission.value = sub;
+  submissionDetails.value = null;
+  isLoadingDetails.value = true;
+
+  try {
+    const res = await api.getSubmissionDetails(sub.id);
+    submissionDetails.value = res.data;
+  } catch (error) {
+    console.error("Erreur détails :", error);
+    alert("Impossible de charger le contenu détaillé de la dictée.");
+  } finally {
+    isLoadingDetails.value = false;
+  }
 };
 
 // --- GESTION DE L'INFOBULLE. ---
 const handleMouseOver = (event: MouseEvent) => {
   const target = event.target as HTMLElement;
-  
   if (target.classList.contains('faute')) {
     tooltip.value = {
       visible: true,
       x: target.offsetLeft,
-      y: target.offsetTop + 30,
-      type: target.getAttribute('data-type') || '',
-      malus: target.getAttribute('data-malus') || '',
+      y: target.offsetTop + 25,
+      type: target.getAttribute('data-type') || 'Inconnu',
+      malus: target.getAttribute('data-malus') || '0',
       corr: target.getAttribute('data-corr') || '',
       desc: target.getAttribute('data-desc') || ''
     };
@@ -181,96 +207,109 @@ const handleMouseOut = (event: MouseEvent) => {
 </script>
 
 <style scoped>
+/* CSS de base. */
 .header { 
-    margin-bottom: 20px; 
+  margin-bottom: 20px; 
+  display: flex; 
+  align-items: center; 
 }
 .header h1 { 
-    font-size: 1.6rem; 
-    color: var(--primary); 
+  font-size: 1.6rem; 
+  color: var(--primary); 
+  margin: 0; 
 }
-
-/* Recherche & Filtres. */
 .search-container { 
-    margin-bottom: 15px; 
-    display: flex; 
-    gap: 10px; 
+  margin-bottom: 15px; 
 }
 .search-input { 
-    flex: 1; 
-    max-width: 400px; 
-    padding: 10px 15px; 
-    border-radius: 20px; 
-    border: 1px solid #ccc; 
-    outline: none; 
+  width: 100%; 
+  max-width: 400px; 
+  padding: 10px 15px; 
+  border-radius: 8px; 
+  border: 1px solid #ccc; 
+  font-size: 1rem; 
 }
-.filter-select { 
-    padding: 10px 15px; 
-    border-radius: 20px; 
-    border: 1px solid #ccc; 
-    outline: none; 
-    background: white; 
-    cursor: pointer; 
+.search-input:focus { 
+  outline: none; 
+  border-color: var(--accent); 
 }
 
-/* Liste Étudiants. */
+/* Liste étudiants. */
 .student-scroll-list { 
-    display: flex; 
-    gap: 15px; 
-    overflow-x: auto; 
-    padding-bottom: 10px; 
-    margin-bottom: 20px; 
+  display: flex; 
+  gap: 15px; 
+  overflow-x: auto; 
+  padding-bottom: 15px; 
+  margin-bottom: 20px; 
+}
+.student-scroll-list::-webkit-scrollbar { 
+  height: 8px; 
+}
+.student-scroll-list::-webkit-scrollbar-track { 
+  background: #f1f1f1; 
+  border-radius: 4px; 
+}
+.student-scroll-list::-webkit-scrollbar-thumb { 
+  background: #ccc; 
+  border-radius: 4px; 
+}
+.student-scroll-list::-webkit-scrollbar-thumb:hover { 
+  background: #bbb; 
 }
 .student-card { 
-    min-width: 200px; 
-    background: white; 
-    padding: 15px; 
-    border-radius: 8px; 
-    border: 1px solid #e1e8ed; 
-    cursor: pointer; 
-    transition: 0.2s; 
+  min-width: 200px; 
+  background: white; 
+  padding: 15px; 
+  border-radius: 8px; 
+  border: 1px solid #e1e8ed; 
+  cursor: pointer; 
+  transition: all 0.2s; 
 }
 .student-card:hover { 
-    transform: translateY(-2px); 
-    border-color: var(--accent); 
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+  transform: translateY(-2px); 
+  border-color: var(--accent); 
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
 }
 .student-card.selected { 
-    border: 2px solid var(--accent); 
-    background-color: #f0f8ff; 
+  border: 2px solid var(--accent); 
+  background-color: #f0f8ff; 
 }
 
-/* Sélecteur Dictées. */
+/* Dictées. */
 .dictation-selector { 
-    margin-bottom: 20px; 
-    padding: 15px; 
-    background: white; 
-    border-radius: 8px; 
-    border: 1px dashed #ccc; 
+  margin-bottom: 20px; 
+  padding: 20px; 
+  background: white; 
+  border-radius: 8px; 
+  border: 1px solid #e1e8ed; 
 }
 .dictation-btn { 
-    padding: 8px 12px; 
-    background: var(--light); 
-    border: 1px solid #ccc; 
-    border-radius: 4px; 
-    cursor: pointer; 
-    margin-right: 10px; 
-    font-size: 0.9rem; 
-    transition: 0.2s; 
+  padding: 10px 15px; 
+  background: var(--light); 
+  border: 1px solid #ccc; 
+  border-radius: 6px; 
+  cursor: pointer; 
+  margin-right: 10px; 
+  font-size: 0.95rem; 
+  font-weight: 500; 
+  transition: 0.2s; 
 }
-.dictation-btn:hover, .dictation-btn.active { 
-    background: var(--accent); 
-    color: white; 
-    border-color: var(--accent); 
+.dictation-btn:hover { 
+  background: #e2e6ea; 
+}
+.dictation-btn.active { 
+  background: var(--accent); 
+  color: white; 
+  border-color: var(--accent); 
 }
 
-/* Layout Atelier. */
+/* L'Atelier (Zone principale). */
 .atelier-container { 
-    display: grid; 
-    grid-template-columns: 2fr 1fr; 
-    gap: 20px; 
+  display: grid; 
+  grid-template-columns: 2fr 1fr; 
+  gap: 20px; 
+  align-items: start; 
 }
-
-/* Éditeur de texte. */
 .text-editor { 
   background: white; 
   padding: 30px; 
@@ -278,136 +317,156 @@ const handleMouseOut = (event: MouseEvent) => {
   border: 1px solid #e1e8ed; 
   font-family: 'Georgia', serif; 
   font-size: 1.15rem; 
-  line-height: 2; 
   min-height: 400px; 
-  position: relative;
+  position: relative; 
+  line-height: 2; 
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
+}
+.content-html { 
+  white-space: pre-wrap; 
 }
 
 :deep(.faute) { 
   cursor: pointer; 
   border-bottom: 2px dashed; 
   padding-bottom: 1px; 
-  font-weight: 500; 
-  transition: 0.2s;
+  font-weight: 600; 
+  transition: 0.2s; 
+  background-color: rgba(255, 200, 200, 0.1); 
 }
 :deep(.faute:hover) { 
-    background-color: rgba(0,0,0,0.05); 
+  background-color: rgba(0,0,0,0.08); 
 }
-:deep(.faute[data-type="D"]) { 
-    border-color: var(--type-d); 
-    color: var(--type-d); 
+:deep(.faute[data-type="D"]) { /* Grammaire */
+  border-color: #e67e22; 
+  color: #e67e22; 
 }
-:deep(.faute[data-type="R"]) { 
-    border-color: var(--type-r); 
-    color: var(--type-r); 
-}
-:deep(.faute[data-type="S"]) { 
-    border-color: var(--type-s); 
-    color: var(--type-s); 
-}
+:deep(.faute[data-type="R"]) { /* Orthographe */
+  border-color: #e74c3c; 
+  color: #e74c3c; 
+} 
+:deep(.faute[data-type="S"]) { /* Syntaxe */
+  border-color: #3498db; 
+  color: #3498db; 
+} 
 :deep(.faute[data-type="AUTRE"]) { 
-    border-color: var(--type-autre); 
-    color: var(--type-autre); 
+  border-color: #9b59b6; 
+  color: #9b59b6; 
 }
 
-/* Infobulle. */
+/* L'Infobulle. */
 .reverso-tooltip { 
   position: absolute; 
   background: white; 
   border: 1px solid #ccc; 
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
-  border-radius: 6px; 
+  box-shadow: 0 4px 15px rgba(0,0,0,0.15); 
+  border-radius: 8px; 
   padding: 15px; 
   width: 280px; 
   z-index: 100; 
-  font-family: 'Segoe UI', sans-serif; 
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+  pointer-events: none; 
 }
 .reverso-tooltip h5 { 
-    font-size: 0.95rem; 
-    margin-bottom: 5px; 
-    color: var(--primary); 
-    display: flex; 
-    justify-content: space-between; 
+  font-size: 0.95rem; 
+  margin: 0 0 8px 0; 
+  color: var(--primary); 
+  display: flex; 
+  justify-content: space-between; 
+  border-bottom: 1px solid #eee; 
+  padding-bottom: 5px; 
 }
 .reverso-tooltip .correction { 
-    font-size: 1.1rem; 
-    font-weight: bold; 
-    color: var(--accent); 
-    margin-bottom: 8px; 
+  font-size: 1.1rem; 
+  font-weight: bold; 
+  color: var(--accent); 
+  margin-bottom: 5px; 
 }
 .reverso-tooltip .desc { 
-    font-size: 0.85rem; 
-    color: #555; 
-    line-height: 1.4; 
+  font-size: 0.85rem; 
+  color: #555; 
+  line-height: 1.4; 
+  font-style: italic; 
 }
 
-/* Panneau droit (Scores). */
+/* Le Panneau Latéral. */
 .panel { 
-    background: white; 
-    padding: 20px; 
-    border-radius: 8px; 
-    border: 1px solid #e1e8ed; 
-    display: flex; 
-    flex-direction: column; 
-    max-height: 600px; 
+  background: white; 
+  padding: 20px; 
+  border-radius: 8px; 
+  border: 1px solid #e1e8ed; 
+  display: flex; 
+  flex-direction: column; 
+  max-height: 600px; 
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
 }
 .score-display { 
-    text-align: center; 
-    margin-bottom: 15px; 
-    padding: 15px; 
-    background: #fff5f5; 
-    border-radius: 8px; 
-    border: 1px solid #fadbd8; 
+  text-align: center; 
+  margin-bottom: 15px; 
+  padding: 15px; 
+  background: #fff5f5; 
+  border-radius: 8px; 
+  border: 1px solid #fadbd8; 
 }
 .score-display span { 
-    font-size: 2.2rem; 
-    font-weight: bold; 
-    color: var(--danger); 
-    display: block; 
+  font-size: 2.2rem; 
+  font-weight: bold; 
+  color: var(--danger); 
+  display: block; 
+  margin: 5px 0; 
 }
 
+/* Liste des erreurs défilante. */
 .error-list { 
-    overflow-y: auto; 
-    flex: 1; 
-    padding-right: 5px; 
+  overflow-y: auto; 
+  flex: 1; 
+  padding-right: 5px; 
+  margin-top: 10px; 
+}
+.error-list::-webkit-scrollbar { 
+  width: 6px; 
+}
+.error-list::-webkit-scrollbar-thumb { 
+  background: #ccc; 
+  border-radius: 3px; 
 }
 .error-item { 
-    padding: 10px; 
-    border-left: 4px solid; 
-    background: #fdfdfd; 
-    margin-bottom: 8px; 
-    font-size: 0.85rem; 
-    border-radius: 4px; 
-    border: 1px solid #eee; 
+  padding: 10px; 
+  border-left: 4px solid #ccc; 
+  background: #fdfdfd; 
+  margin-bottom: 8px; 
+  font-size: 0.85rem; 
+  border-radius: 4px; 
+  border: 1px solid #eee; 
 }
 .error-item[data-type="D"] { 
-    border-left-color: var(--type-d); 
+  border-left-color: #e67e22; 
 }
 .error-item[data-type="R"] { 
-    border-left-color: var(--type-r); 
+  border-left-color: #e74c3c; 
 }
 .error-item[data-type="S"] { 
-    border-left-color: var(--type-s); 
+  border-left-color: #3498db; 
 }
 .error-item[data-type="AUTRE"] { 
-    border-left-color: var(--type-autre); 
+  border-left-color: #9b59b6; 
 }
 
 .btn { 
-    padding: 8px 16px; 
-    border-radius: 5px; 
-    cursor: pointer; 
-    font-weight: 500; 
-    transition: 0.2s; 
-    border: none; 
+  padding: 8px 16px; 
+  border-radius: 5px; 
+  cursor: pointer; 
+  font-weight: 500; 
+  transition: 0.2s; 
+  border: none; 
 }
 .btn-outline { 
-    background: transparent; 
-    border: 1px solid #ccc; 
-    color: var(--text); 
+  background: transparent; 
+  border: 1px solid #ccc; 
+  color: var(--text); 
 }
 .btn-outline:hover { 
-    background: #f8f9fa; 
-    border-color: var(--primary); 
+  background: #f8f9fa; 
+  border-color: var(--primary); 
 }
 </style>

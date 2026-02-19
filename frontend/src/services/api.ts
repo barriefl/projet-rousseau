@@ -20,6 +20,16 @@ export default {
         return apiClient.post('/dictations', payload);
     },
 
+    getStudentSubmissions(studentUuid: string) {
+        return apiClient.get('/submissions', {
+        params: {
+            student_uuid: studentUuid
+        }
+        });
+    },
+    getSubmissionDetails(submissionId: number | string) {
+        return apiClient.get(`/submissions/${submissionId}`);
+    },
     createSubmission(payload: { 
         student_uuid: string; 
         dictation_id: string; 

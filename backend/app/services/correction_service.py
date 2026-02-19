@@ -230,3 +230,28 @@ class CorrectionService:
             self.session.add(m)
 
         return submission
+    
+    def generate_html_text(self, text: str, mistakes: List[Mistake]) -> str:
+        """
+        Génère le texte HTML avec les balises <span> pour les fautes.
+        On lit les erreurs à l'envers pour ne pas décaler les index lors de l'insertion !
+        """
+        import html
+        
+        sorted_mistakes = sorted(mistakes, key=lambda m: m.position_index, reverse=True)
+        html_text = text
+
+        for m in sorted_mistakes:
+            start = m.position_index
+            end = start + m.length
+            
+            word = html_text[start:end]
+            
+            desc = html.escape(m.message) if m.message else ""
+            corr = html.escape(m.correct_word) if m.correct_word else ""
+            
+            span = f'<span class="faute" data-type="{m.type_rousseau}" data-malus="{m.malus_applied}" data-corr="{corr}" data-desc="{desc}">{word}</span>'
+            
+            html_text = html_text[:start] + span + html_text[end:]
+
+        return html_text.replace('\n', '<br>')
