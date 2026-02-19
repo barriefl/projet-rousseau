@@ -127,18 +127,28 @@ class Dictation(TimestampMixin, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
 
+class Rule(TimestampMixin, table=True):
+    __tablename__ = "rules"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    lt_rule_id: str = Field(unique=True, index=True, description="L'ID exact de la règle LanguageTool.")
+    description: str = Field(description="Description ou message par défaut de la règle.")
+    is_active: bool = Field(default=True, description="Si False, cette règle sera ignorée lors de la correction.")
+
+    grading_scale_id: Optional[int] = Field(default=None, foreign_key="grading_scales.id")
+    grading_scale: Optional["GradingScale"] = Relationship(back_populates="rules")
+
 class GradingScale(TimestampMixin, table=True):
     __tablename__ = "grading_scales"
 
     id: Optional[int] = Field(default=None, primary_key=True)
 
-    code: str = Field(unique=True)
     name: str
     description: str
     type_rousseau: MistakeType
     penalty: float = Field(default=1.0)
 
-    lt_rule_patterns: Optional[str] = Field(default=None, description="Mots clés des règles LanguageTool associés, séparés par virgule.")
+    rules: List["Rule"] = Relationship(back_populates="grading_scale")
 
 class Submission(TimestampMixin, table=True):
     __tablename__ = "submissions"
@@ -168,13 +178,13 @@ class Mistake(TimestampMixin, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     submission_id: int = Field(foreign_key="submissions.id")
+    grading_scale_id: Optional[int] = Field(foreign_key="grading_scales.id")
 
     student_word: str
     correct_word: str
     position_index: int = Field(description="Index de position du mot dans le texte (pour le surlignage).")
     length: int
 
-    category_code: str
     type_rousseau: MistakeType = Field(description="Type de faute selon la typologie demandée (D : dessin graphique du mot, S : sens, R : règle de grammaire ou de conjugaison).")
     malus_applied: float
 

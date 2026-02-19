@@ -21,7 +21,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from app.database import engine, init_db
 from app.models import (
-    AssessmentResult, AssessmentType, GradingScale, Group, MistakeType, Platform, Student, Dictation, Submission, Mistake, 
+    AssessmentResult, AssessmentType, GradingScale, Group, MistakeType, Platform, Rule, Student, Dictation, Submission, Mistake, 
     CSP, Degree, ReadingSupport, Library
 )
 from app.utils.crypto import encrypt_text
@@ -640,80 +640,98 @@ class AssessmentImporter:
                 self.stats.errors.append(f"Erreur Ecri+ {path.name}: {e}")
 
 def seed_grading_scales(session: Session, stats: ImportStats, dry_run: bool):
-    """Initialise les barèmes de correction Rousseau."""
+    """Initialise les barèmes de correction Rousseau et les règles LT associées."""
     if dry_run:
         return
 
     scales_data = [
         {
-            "code": "1",
             "name": "Fautes de frappe ou erreur sur les lettres muettes", 
             "description": "Substitutions, omissions, ajouts de lettres ou de mots.",
             "type_rousseau": MistakeType.D,
             "penalty": 0.5,
-            "lt_rule_patterns": "misspelling,typo"
+            "patterns": ["misspelling", "typo", "MORFOLOGIK_RULE_FR_FR"]
         },
         {
-            "code":"2",
             "name": "Erreurs d'accents et de cédilles", 
             "description": "Absence ou mauvaises utilisation des accents (ex : é/è/ê), absence ou mauvaise utilisation de la cédille (ex : ç).",
             "type_rousseau": MistakeType.R,
             "penalty": 1.0,
-            "lt_rule_patterns": "accent,cedille"
+            "patterns": ["accent", "cedille"]
         },
         {
-            "code": "3",
             "name": "Erreurs de doublement", 
             "description": "Doubles consonnes ou voyelles manquantes ou superflues.",
             "type_rousseau": MistakeType.D,
             "penalty": 0.5,
-            "lt_rule_patterns": "double"
+            "patterns": ["double"]
         },
         {
-            "code": "4",
             "name": "Confusions homophoniques", 
             "description": "Confondre des mots qui se prononcent de la même manière mais s'écrivent différemment (ex : a/à, et/est, ses/ces/s'est/c'est, mais/mes).",
             "type_rousseau": MistakeType.S,
             "penalty": 1.0,
-            "lt_rule_patterns": "homophone,confused_words"
+            "patterns": ["homophone", "confused_words"]
         },
         {
-            "code": "5",
             "name": "Erreurs de terminaison", 
             "description": "Mauvaise conjugaison des verbes, mauvaise formation  des adjectifs et des participes passés.",
             "type_rousseau": MistakeType.R,
             "penalty": 1.0,
-            "lt_rule_patterns": "grammar,conjugation,agreement"
+            "patterns": ["grammar", "conjugation", "agreement"]
         },
         {
-            "code": "AUTRE",
             "name": "Autre erreur",
             "description": "Erreur non classifiée.",
             "type_rousseau": MistakeType.AUTRE,
             "penalty": 0.0,
-            "lt_rule_patterns": ""
+            "patterns": []
         }
     ]
 
-    count = 0
-    for data in scales_data:
-        existing = session.exec(select(GradingScale).where(GradingScale.code == data["code"])).first()
+    count_scales = 0
+    count_rules = 0
 
-        if not existing:
-            scale = GradingScale(**data)
+    for data in scales_data:
+        existing_scale = session.exec(select(GradingScale).where(GradingScale.name == data["name"])).first()
+
+        if not existing_scale:
+            scale = GradingScale(
+                name=data["name"],
+                description=data["description"],
+                type_rousseau=data["type_rousseau"],
+                penalty=data["penalty"]
+            )
             session.add(scale)
-            count += 1
+            session.commit()
+            session.refresh(scale)
+            count_scales += 1
         else:
-            existing.name = data["name"]
-            existing.description = data["description"]
-            existing.type_rousseau = data["type_rousseau"]
-            existing.penalty = data["penalty"]
-            existing.lt_rule_patterns = data["lt_rule_patterns"]
-            session.add(existing)
+            scale = existing_scale
+            scale.description = data["description"]
+            scale.type_rousseau = data["type_rousseau"]
+            scale.penalty = data["penalty"]
+            session.add(scale)
+            session.commit()
+
+        for pattern in data["patterns"]:
+            existing_rule = session.exec(select(Rule).where(Rule.lt_rule_id == pattern)).first()
+            if not existing_rule:
+                new_rule = Rule(
+                    lt_rule_id=pattern,
+                    description=f"Règle de base pour {scale.name}",
+                    is_active=True,
+                    grading_scale_id=scale.id
+                )
+                session.add(new_rule)
+                count_rules += 1
+            else:
+                existing_rule.grading_scale_id = scale.id
+                session.add(existing_rule)
 
     if not dry_run:
         session.commit()
-        logger.info(f"📏 Barèmes : {count} règles créées ou mises à jour.")
+        logger.info(f"📏 Barèmes : {count_scales} typologies et {count_rules} règles LT créées/mises à jour.")
     
 def seed_dictations(session: Session, student_service: StudentService, stats: ImportStats, dry_run: bool):
     """Import des dictées (par vague)."""
@@ -758,7 +776,7 @@ def seed_dictations(session: Session, student_service: StudentService, stats: Im
             title = f"Dictées Étude Rousseau ({suffix})"
             dictation = session.exec(select(Dictation).where(Dictation.title == title)).first()
             if not dictation:
-                default_rules = {s.code: s.penalty for s in session.exec(select(GradingScale)).all()}
+                default_rules = {s.name: s.penalty for s in session.exec(select(GradingScale)).all()}
 
                 dictation = Dictation(
                     title=title, 

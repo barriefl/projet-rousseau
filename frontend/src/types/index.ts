@@ -57,3 +57,12 @@ export interface Dictation {
   title: string;
   content_reference: string;
 }
+
+export interface GradingScale {
+  id: number;
+  code: string;
+  name: string;
+  type_rousseau: string;
+  penalty: number;
+  lt_rule_patterns: string | null;
+}

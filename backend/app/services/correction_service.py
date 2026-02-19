@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Tuple
 import requests
 from sqlalchemy.orm import Session
 from sqlmodel import select
-from app.models import GradingScale, Mistake, Submission
+from app.models import GradingScale, Mistake, Rule, Submission
 
 class CorrectionService:
     DEFAULT_LT_URL = "http://languagetool:8010/v2/check"
@@ -14,29 +14,35 @@ class CorrectionService:
         self.lt_api_url = lt_url or self.DEFAULT_LT_URL
         self.scales = self.session.exec(select(GradingScale)).all()
 
-    def _get_scale_by_code(self, code: str) -> GradingScale:
-        """Helper pour récupérer une règle par son code (ex: '1')."""
-        return next((s for s in self.scales if s.code == code), None)
+    def _get_scale_by_name(self, name: str) -> GradingScale:
+        """Helper pour récupérer une règle par son nom."""
+        return next((s for s in self.scales if s.name == name), None)
 
     def _get_scale_for_lt_match(self, match: Dict[str, Any]) -> GradingScale:
-        """Mappe une erreur LanguageTool vers une règle Rousseau."""
-        rule_id = match["rule"]["id"].lower()
-        issue_type = match["rule"]["issueType"].lower()
-
-        for scale in self.scales:
-            if not scale.lt_rule_patterns:
-                continue
-
-            patterns = [p.strip().lower() for p in scale.lt_rule_patterns.split(",")]
-
-            for pattern in patterns:
-                if pattern in rule_id or pattern in issue_type:
-                    return scale
-                
-        if issue_type == "misspelling":
-            return self._get_scale_by_code("1")
+        """Auto-découverte : mappe, ignore, ou crée une règle LT."""
+        rule_id = match["rule"]["id"]
         
-        return self._get_scale_by_code("AUTRE")
+        rule = self.session.exec(select(Rule).where(Rule.lt_rule_id == rule_id)).first()
+
+        if not rule:
+            description = match.get("message", f"Règle LT: {rule_id}")
+            rule = Rule(
+                lt_rule_id=rule_id,
+                description=description[:255],
+                is_active=True,
+                grading_scale_id=None
+            )
+            self.session.add(rule)
+            self.session.commit()
+            self.session.refresh(rule)
+
+        if not rule.is_active:
+            return None
+        
+        if rule.grading_scale_id:
+            return self.session.get(GradingScale, rule.grading_scale_id)
+        
+        return self._get_scale_by_name("Autre erreur")
     
     def _check_fidelity(self, ref_text: str, student_text: str, existing_mistakes_ranges: List[Tuple[int, int]]) -> List[Mistake]:
         """
@@ -85,14 +91,14 @@ class CorrectionService:
                     if is_already_caught:
                         continue
 
-                    scale = self._get_scale_by_code("1")
+                    scale = self._get_scale_by_name("Fautes de frappe ou erreur sur les lettres muettes")
                     
                     mistakes.append(Mistake(
                         student_word=token["text"],
                         correct_word=ref_word,
                         position_index=token["start"],
                         length=token["end"] - token["start"],
-                        category_code=scale.code,
+                        grading_scale_id=scale.id,
                         type_rousseau=scale.type_rousseau,
                         malus_applied=scale.penalty,
                         rule_id_lt="FIDELITY_SUBSTITUTION",
@@ -102,7 +108,7 @@ class CorrectionService:
 
             # --- CAS 2 : INSERTION (AJOUT). ---
             elif tag == 'insert':
-                scale = self._get_scale_by_code("1")
+                scale = self._get_scale_by_name("Fautes de frappe ou erreur sur les lettres muettes")
                 
                 for k in range(j1, j2):
                     token = stu_tokens[k]
@@ -111,7 +117,7 @@ class CorrectionService:
                         correct_word="",
                         position_index=token["start"],
                         length=token["end"] - token["start"],
-                        category_code=scale.code,
+                        grading_scale_id=scale.id,
                         type_rousseau=scale.type_rousseau,
                         malus_applied=scale.penalty,
                         rule_id_lt="FIDELITY_ADDITION",
@@ -121,7 +127,7 @@ class CorrectionService:
 
             # --- CAS 3 : SUPPRESSION (OUBLI). ---
             elif tag == 'delete':
-                scale = self._get_scale_by_code("1")
+                scale = self._get_scale_by_name("Fautes de frappe ou erreur sur les lettres muettes")
                 
                 pos_anchor = stu_tokens[j1]["start"] if j1 < len(stu_tokens) else len(student_text)
                 
@@ -132,7 +138,7 @@ class CorrectionService:
                     correct_word=missing_words,
                     position_index=pos_anchor,
                     length=0,
-                    category_code=scale.code,
+                    grading_scale_id=scale.id,
                     type_rousseau=scale.type_rousseau,
                     malus_applied=scale.penalty,
                     rule_id_lt="FIDELITY_OMISSION",
@@ -185,7 +191,7 @@ class CorrectionService:
                         correct_word=match["replacements"][0]["value"] if match["replacements"] else "",
                         position_index=match["offset"],
                         length=match["length"],
-                        category_code=scale.code,
+                        grading_scale_id=scale.id,
                         type_rousseau=scale.type_rousseau,
                         malus_applied=scale.penalty,
                         rule_id_lt=match["rule"]["id"],
@@ -206,13 +212,12 @@ class CorrectionService:
         total_penalty = 0.0
         scores_breakdown = {}
 
-        code_to_name = {s.code: s.name for s in self.scales}
+        id_to_name = {s.id: s.name for s in self.scales}
 
         for m in all_mistakes:
             total_penalty += m.malus_applied
 
-            code = m.category_code
-            category_name = code_to_name.get(code, code)
+            category_name = id_to_name.get(m.grading_scale_id, "Autre erreur")
 
             if category_name not in scores_breakdown:
                 scores_breakdown[category_name] = 0.0
@@ -222,7 +227,6 @@ class CorrectionService:
         scores_breakdown = {k: round(v, 2) for k, v in scores_breakdown.items()}
 
         submission.final_score = round(total_penalty, 2)
-        
         submission.scores = scores_breakdown
         
         for m in all_mistakes:

@@ -39,6 +39,24 @@ export default {
         return apiClient.post('/submissions', payload);
     },
 
+    getGradingScales() {
+        return apiClient.get('/grading-scales');
+    },
+    createGradingScale(payload: any) {
+        return apiClient.post('/grading-scales', payload);
+    },   
+    deleteGradingScale(scaleId: number) {
+        return apiClient.delete(`/grading-scales/${scaleId}`);
+    },
+
+    getUnclassifiedRules() {
+        return apiClient.get('/rules/unclassified');
+    },
+    
+    updateRule(ruleId: number, payload: any) {
+        return apiClient.patch(`/rules/${ruleId}`, payload);
+    },
+
     getStudents() {
         return apiClient.get<Student[]>('/students');
     },
