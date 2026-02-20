@@ -66,3 +66,13 @@ export interface GradingScale {
   penalty: number;
   lt_rule_patterns: string | null;
 }
+
+export interface StudentProgression {
+  id: string;
+  first_name: string;
+  last_name: string;
+  group: string | null;
+  score_initial: number | null;
+  score_final: number | null;
+  progress: number | null;
+}

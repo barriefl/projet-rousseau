@@ -60,6 +60,9 @@ export default {
     getStudents() {
         return apiClient.get<Student[]>('/students');
     },
+    getStudentProgression() {
+        return apiClient.get('/students/stats/progression');
+    },
     deleteStudent(studentId: string) {
         return apiClient.delete(`/students/${studentId}`);
     }

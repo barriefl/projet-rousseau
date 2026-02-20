@@ -8,3 +8,12 @@ class StudentResponse(BaseModel):
     last_name: str
     promo: str
     group: str
+
+class StudentProgressionResponse(BaseModel):
+    id: uuid.UUID
+    first_name: str
+    last_name: str
+    group: Optional[str] = None
+    score_initial: Optional[float] = None
+    score_final: Optional[float] = None
+    progress: Optional[float] = None
