@@ -1,153 +1,141 @@
 from sqlmodel import Session, select
-from app.models import AssessmentResult, AssessmentType, Group, Platform, Student, Submission
-from sqlalchemy import Float, cast, func
+from app.models import AssessmentResult, Student, Submission
 
 class StatsService:
     def __init__(self, session: Session):
         self.session = session
 
-    def _get_dictation_avg(self, a_type, group: Group = None) -> float:
-        query = self.session.query(
-            func.avg(
-                cast(func.json_extract_path_text(Submission.scores, 'raw'), Float)
-            )
-        ).filter(Submission.assessment_type == a_type)
-
-        if group:
-            query = query.join(Student).filter(Student.group == group)
+    def get_rousseau_dashboard_stats(self) -> dict:
+        students = self.session.exec(select(Student)).all()
+        assessments = self.session.exec(select(AssessmentResult)).all()
         
-        result = query.scalar()
-        return result or 0.0
-    
-    def _get_platform_avg(self, platform: Platform, a_type: AssessmentType, group: Group = None) -> float:
-        query = self.session.query(func.avg(AssessmentResult.score))\
-            .filter(AssessmentResult.platform == platform)\
-            .filter(AssessmentResult.assessment_type == a_type)
-
-        if group:
-            query = query.join(Student).filter(Student.group == group)
-
-        result = query.scalar()
-        return result or 0.0
-
-    def get_global_kpis(self):
-        """Récupère les indicateurs clés globaux."""
-
-        total_students = self.session.query(Student).count()
-        total_submissions = self.session.query(Submission).count()
-        total_voltaire_assessments = self.session.query(AssessmentResult)\
-            .filter(AssessmentResult.platform == Platform.VOLTAIRE)\
-            .count()
-        total_ecriplus_assessments = self.session.query(AssessmentResult)\
-            .filter(AssessmentResult.platform == Platform.ECRIPLUS)\
-            .count()
-
-        submissions_avg_init = self._get_dictation_avg(AssessmentType.INITIAL)
-        submissions_avg_final = self._get_dictation_avg(AssessmentType.FINAL)
+        initial_scores = {}
+        final_scores = {}
         
-        voltaire_avg_init = self._get_platform_avg(Platform.VOLTAIRE, AssessmentType.INITIAL)
-        voltaire_avg_final = self._get_platform_avg(Platform.VOLTAIRE, AssessmentType.FINAL)
+        for student in students:
+            for sub in student.submissions:
+                if sub.assessment_type.name == "INITIAL" and sub.final_score is not None:
+                    initial_scores[student.id] = sub.final_score
+                elif sub.assessment_type.name == "FINAL" and sub.final_score is not None:
+                    final_scores[student.id] = sub.final_score
 
-        ecriplus_avg_init = self._get_platform_avg(Platform.ECRIPLUS, AssessmentType.INITIAL)
-        ecriplus_avg_final = self._get_platform_avg(Platform.ECRIPLUS, AssessmentType.FINAL)
+        initial_g0_g4 = [
+            score for s_id, score in initial_scores.items() 
+            if any(s.id == s_id and s.group and s.group.name != "G5" for s in students)
+        ]
+        avg_initial_g0_g4 = sum(initial_g0_g4) / len(initial_g0_g4) if initial_g0_g4 else 0.0
 
-        submissions_progression = submissions_avg_final- submissions_avg_init
-        voltaire_progression = voltaire_avg_final - voltaire_avg_init
-        ecriplus_progression = ecriplus_avg_final - ecriplus_avg_init
+        progressions = {}
+        for s in students:
+            if s.id in final_scores:
+                f_score = final_scores[s.id]
+                if s.group and s.group.name == "G5" and s.id not in initial_scores:
+                    i_score = avg_initial_g0_g4
+                else:
+                    i_score = initial_scores.get(s.id)
+                
+                if i_score is not None:
+                    progressions[s.id] = f_score - i_score
 
-        return {
-            "total_students": total_students,
-            "submissions": {
-                "total": total_submissions,
-                "avg_init": round(submissions_avg_init, 2),
-                "avg_final": round(submissions_avg_final, 2),
-                "progression": round(submissions_progression, 2)
-            },
-            "voltaire": {
-                "total": total_voltaire_assessments,
-                "avg_init": round(voltaire_avg_init, 2),
-                "avg_final": round(voltaire_avg_final, 2),
-                "progression": round(voltaire_progression, 2)
-            },
-            "ecriplus": {
-                "total": total_ecriplus_assessments,
-                "avg_init": round(ecriplus_avg_init, 2),
-                "avg_final": round(ecriplus_avg_final, 2),
-                "progression": round(ecriplus_progression, 2)
-            }
+        def safe_avg(scores_list):
+            return round(sum(scores_list) / len(scores_list), 2) if scores_list else 0.0
+
+        # --- HYPOTHÈSE 1 : Outils (VD2) vs Dictées (VD1). ---
+        vd1_initial_vals = [
+            initial_scores.get(s.id, avg_initial_g0_g4 if (s.group and s.group.name == "G5") else None) 
+            for s in students if s.group and s.group.name != "G0" and s.id in final_scores
+        ]
+        vd1_final_vals = [
+            final_scores[s.id] for s in students if s.group and s.group.name != "G0" and s.id in final_scores
+        ]
+
+        vd2_initial_vals = [a.score for a in assessments if a.assessment_type.name == "INITIAL" and a.student.group.name != "G0"]
+        vd2_final_vals = [a.score for a in assessments if a.assessment_type.name == "FINAL" and a.student.group.name != "G0"]
+
+        vd1_initial_vals = [v for v in vd1_initial_vals if v is not None]
+
+        # --- HYPOTHÈSE 2 : Équivalence G2 vs G5. ---
+        final_g2 = [final_scores[s.id] for s in students if s.group and s.group.name == "G2" and s.id in final_scores]
+        final_g5 = [final_scores[s.id] for s in students if s.group and s.group.name == "G5" and s.id in final_scores]
+
+        # --- HYPOTHÈSE 3 : Facteur Enseignant (G4 vs Autres G2/G3/G5). ---
+        final_g4 = [final_scores[s.id] for s in students if s.group and s.group.name == "G4" and s.id in final_scores]
+        final_others = [final_scores[s.id] for s in students if s.group and s.group.name in ["G2", "G3", "G5"] and s.id in final_scores]
+
+        # --- HYPOTHÈSE 4 : Socioculturel (Lecture vs Progression). ---
+        categories = {
+            "Appétence à la lecture": {},
+            "Présence d'une bibliothèque": {},
+            "Support de lecture": {},
+            "CSP Parent 1": {},
+            "Degree Parent 1": {},
+            "CSP Parent 2": {},
+            "Degree Parent 2": {},
+            "Niveau déclaré": {}
         }
-    
-    def get_group_stats(self):
-        """Récupère les statistiques détaillées par groupe de manière dynamique et triée."""
         
-        active_groups = self.session.query(Student.group)\
-            .distinct()\
-            .filter(Student.group.isnot(None))\
-            .order_by(Student.group)\
-            .all()
-        
-        group_data = {}
-        
-        for (grp_enum,) in active_groups:
-            if not grp_enum: continue
+        for s in students:
+            if s.id in progressions:
+                prog = progressions[s.id]
+                
+                # 1. Appétence.
+                app = s.appetence_level if getattr(s, 'appetence_level', None) else "Non renseigné"
+                categories["Appétence à la lecture"].setdefault(f"Niveau {app}" if app != "Non renseigné" else app, []).append(prog)
+                
+                # 2. Bibliothèque.
+                bib = s.has_library.value if getattr(s, 'has_library', None) else "Non renseigné"
+                categories["Présence d'une bibliothèque"].setdefault(str(bib), []).append(prog)
+                
+                # 3. Support.
+                sup = s.reading_support.value if getattr(s, 'reading_support', None) else "Non renseigné"
+                categories["Support de lecture"].setdefault(str(sup), []).append(prog)
+                
+                # 4. CSP Parent 1.
+                csp = s.parent_1_csp.value if getattr(s, 'parent_1_csp', None) else "Non renseigné"
+                categories["CSP Parent 1"].setdefault(str(csp), []).append(prog)
 
-            student_count = self.session.query(Student).filter(Student.group == grp_enum).count()
+                # 5. Degree Parent 1.
+                degree = s.parent_1_degree.value if getattr(s, 'parent_1_degree', None) else "Non renseigné"
+                categories["Degree Parent 1"].setdefault(str(degree), []).append(prog)
 
-            sub_count = self.session.query(Submission).join(Student)\
-                .filter(Student.group == grp_enum).count()
-            
-            d_init = self._get_dictation_avg(AssessmentType.INITIAL, group=grp_enum)
-            d_final = self._get_dictation_avg(AssessmentType.FINAL, group=grp_enum)
+                # 6. CSP Parent 2.
+                csp = s.parent_2_csp.value if getattr(s, 'parent_2_csp', None) else "Non renseigné"
+                categories["CSP Parent 2"].setdefault(str(csp), []).append(prog)
 
-            dictations_data = {
-                "total": sub_count,
-                "avg_init": round(d_init, 2),
-                "avg_final": round(d_final, 2),
-                "progression": round(d_final - d_init, 2)
-            }
+                # 7. Degree Parent 2.
+                degree = s.parent_2_degree.value if getattr(s, 'parent_2_degree', None) else "Non renseigné"
+                categories["Degree Parent 2"].setdefault(str(degree), []).append(prog)
 
-            volt_count = self.session.query(AssessmentResult).join(Student)\
-                .filter(Student.group == grp_enum, AssessmentResult.platform == Platform.VOLTAIRE).count()
-            
-            ecri_count = self.session.query(AssessmentResult).join(Student)\
-                .filter(Student.group == grp_enum, AssessmentResult.platform == Platform.ECRIPLUS).count()
+                # 8. Niveau déclaré.
+                niv = s.declared_level if getattr(s, 'declared_level', None) else "Non renseigné"
+                categories["Niveau déclaré"].setdefault(f"Niveau {niv}" if niv != "Non renseigné" else niv, []).append(prog)
 
-            external_data = None
-
-            if volt_count == 0 and ecri_count == 0:
-                external_data = None
-            
-            elif volt_count >= ecri_count:
-                v_init = self._get_platform_avg(Platform.VOLTAIRE, AssessmentType.INITIAL, group=grp_enum)
-                v_final = self._get_platform_avg(Platform.VOLTAIRE, AssessmentType.FINAL, group=grp_enum)
-                external_data = {
-                    "platform_name": "Voltaire",
-                    "total": volt_count,
-                    "avg_init": round(v_init, 2),
-                    "avg_final": round(v_final, 2),
-                    "progression": round(v_final - v_init, 2)
-                }
-
-            else:
-                e_init = self._get_platform_avg(Platform.ECRIPLUS, AssessmentType.INITIAL, group=grp_enum)
-                e_final = self._get_platform_avg(Platform.ECRIPLUS, AssessmentType.FINAL, group=grp_enum)
-                external_data = {
-                    "platform_name": "Ecri+",
-                    "total": ecri_count,
-                    "avg_init": round(e_init, 2),
-                    "avg_final": round(e_final, 2),
-                    "progression": round(e_final - e_init, 2)
-                }
-
-            group_data[grp_enum.value] = {
-                "student_count": student_count,
-                "dictations": dictations_data,
-                "external_assessment": external_data
+        sociocultural_impact = {}
+        for cat_name, val_dict in categories.items():
+            sociocultural_impact[cat_name] = {
+                k: safe_avg(v) for k, v in sorted(val_dict.items())
             }
 
         return {
-            "total_groups": len(active_groups),
-            "groups": group_data
+            "tools_vs_dictation": {
+                "VD1 (Dictées - Moyenne malus)": {
+                    "Initial": safe_avg(vd1_initial_vals),
+                    "Final": safe_avg(vd1_final_vals)
+                },
+                "VD2 (Outils - Score)": {
+                    "Initial": safe_avg(vd2_initial_vals),
+                    "Final": safe_avg(vd2_final_vals)
+                }
+            },
+            "equivalence_g2_g5": {
+                "Score Final G2": safe_avg(final_g2),
+                "Score Final G5": safe_avg(final_g5)
+            },
+            "teacher_factor": {
+                "Accompagnement Humain (G4)": safe_avg(final_g4),
+                "Autonomie / Outils (G2, G3, G5)": safe_avg(final_others)
+            },
+            "sociocultural_impact": sociocultural_impact
         }
     
     def get_emile_dashboard_stats(self) -> dict:

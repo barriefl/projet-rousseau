@@ -18,25 +18,6 @@ export interface Submission {
     mistakes: Mistake[];
 }
 
-export interface GlobalStats {
-    total_students: number;
-    submissions: {
-        avg_init: number;
-        avg_final: number;
-        progression: number;
-    };
-    voltaire: {
-        avg_init: number;
-        avg_final: number;
-        progression: number;
-    };
-    ecriplus: {
-        avg_init: number;
-        avg_final: number;
-        progression: number;
-    };
-}
-
 export interface CorrectionPayload {
     student_id: number;
     dictation_id: number;

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { GlobalStats, Dictation, Student } from '@/types';
+import type { Dictation, Student } from '@/types';
 
 const apiClient = axios.create({
     baseURL: 'http://localhost:8000/api',
@@ -9,8 +9,8 @@ const apiClient = axios.create({
 });
 
 export default {
-    getGlobalStats() {
-        return apiClient.get<GlobalStats>('/stats/global');
+    getRousseauStats() {
+        return apiClient.get('/stats/rousseau');
     },
     getEmileDashboardStats() {
         return apiClient.get('/stats/emile');
