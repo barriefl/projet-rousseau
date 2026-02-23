@@ -8,8 +8,8 @@ class StudentResponse(BaseModel):
     id: uuid.UUID
     first_name: str
     last_name: str
-    promo: str
-    group: str
+    promo: Optional[str] = None
+    group: Optional[str] = None
 
 class StudentProgressionResponse(BaseModel):
     id: uuid.UUID

@@ -1,4 +1,4 @@
-from socket import socket
+import socket
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select

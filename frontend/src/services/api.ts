@@ -42,7 +42,7 @@ export default {
         return apiClient.post('/submissions', payload);
     },
     async createBulkSubmissions(submissions: SubmissionCreate[]) {
-        const response = await apiClient.post('/api/submissions/bulk', submissions);
+        const response = await apiClient.post('/submissions/bulk', submissions);
         return response.data;
     },
 
@@ -71,7 +71,7 @@ export default {
         return apiClient.get('/students/stats/progression');
     },
     async createStudent(studentData: StudentCreate) {
-        const response = await apiClient.post('/api/students/', studentData);
+        const response = await apiClient.post('/students/', studentData);
         return response.data;
     },
     deleteStudent(studentId: string) {

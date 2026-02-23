@@ -25,8 +25,8 @@
           <div class="form-group">
             <label>Type d'évaluation :</label>
             <select v-model="submissionType">
-              <option value="INITIAL">Dictée Initiale</option>
-              <option value="FINAL">Dictée Finale</option>
+              <option value="Initiale">Dictée Initiale</option>
+              <option value="Finale">Dictée Finale</option>
             </select>
           </div>
         </div>
@@ -155,7 +155,7 @@ const dictations = ref<Dictation[]>([]);
 
 // Valeurs globales du formulaire.
 const selectedDictation = ref('');
-const submissionType = ref('INITIAL');
+const submissionType = ref('Initiale');
 
 // Liste des fichiers déposés.
 const parsedFiles = ref<ParsedFile[]>([]);
@@ -325,9 +325,9 @@ const createNewStudent = async (fileItem: ParsedFile) => {
   }
 };
 
-const getStudentName = (id: string | null) => {
-  if (!id) return '';
-  const s = students.value.find(s => s.id === id);
+const getStudentName = (uuid: string | null) => {
+  if (!uuid) return '';
+  const s = students.value.find(s => s.id === uuid);
   return s ? `${s.last_name} ${s.first_name}` : 'Inconnu';
 };
 
