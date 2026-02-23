@@ -12,6 +12,9 @@ export default {
     getGlobalStats() {
         return apiClient.get<GlobalStats>('/stats/global');
     },
+    getEmileDashboardStats() {
+        return apiClient.get('/stats/emile');
+    },
 
     getDictations() {
         return apiClient.get<Dictation[]>('/dictations');

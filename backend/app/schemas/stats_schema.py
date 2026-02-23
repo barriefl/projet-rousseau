@@ -49,3 +49,15 @@ class GroupStatsDetail(BaseModel):
 class GroupStatsResponse(BaseModel):
     total_groups: int
     groups: Dict[str, GroupStatsDetail]
+
+# Dashboard É.M.I.L.E.
+class EmileStatsResponse(BaseModel):
+    total_students: int
+    total_submissions: int
+    global_average: float
+    group_distribution: Dict[str, int]
+    group_averages: Dict[str, float]
+    promo_averages: Dict[str, float]
+    comparison_tool: Dict[str, float]
+    comparison_human_robot: Dict[str, float]
+    comparison_motivation: Dict[str, float]
