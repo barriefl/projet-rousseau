@@ -14,8 +14,8 @@ class EmileStatsResponse(BaseModel):
     total_submissions: int
     global_average: float
     group_distribution: Dict[str, int]
-    group_averages: Dict[str, float]
-    promo_averages: Dict[str, float]
-    comparison_tool: Dict[str, float]
-    comparison_human_robot: Dict[str, float]
-    comparison_motivation: Dict[str, float]
+    group_averages: Dict[str, Dict[str, float]]
+    promo_averages: Dict[str, Dict[str, float]]
+    comparison_tool: Dict[str, Dict[str, float]]
+    comparison_human_robot: Dict[str, Dict[str, float]]
+    comparison_motivation: Dict[str, Dict[str, float]]

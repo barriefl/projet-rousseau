@@ -11,7 +11,7 @@
     <div v-else-if="stats">
       <div class="grid-3">
         <div class="card">
-          <h3>Total Étudiants Inscrits</h3>
+          <h3>Total Étudiants</h3>
           <div class="stat-val">{{ stats.total_students }}</div>
           <div class="stat-desc">Ayant passé au moins une dictée</div>
         </div>
@@ -19,13 +19,13 @@
         <div class="card">
           <h3>Dictées Traitées</h3>
           <div class="stat-val">{{ stats.total_submissions }}</div>
-          <div class="stat-desc">Analysées par l'outil</div>
+          <div class="stat-desc">Analysées par É.M.I.L.E.</div>
         </div>
         
         <div class="card">
           <h3>Moyenne Globale (Malus)</h3>
           <div class="stat-val danger">{{ stats.global_average }} pts</div>
-          <div class="stat-desc">Moyenne de toutes les copies finales</div>
+          <div class="stat-desc">Moyenne de toutes les copies</div>
         </div>
       </div>
       
@@ -126,73 +126,68 @@ const distributionChartData = computed(() => {
   };
 });
 
-// 2. Moyennes par groupe.
+// 2. Moyennes par groupe (Double Barre).
 const averagesChartData = computed(() => {
   if (!stats.value?.group_averages) return { labels: [], datasets: [] };
+  const labels = Object.keys(stats.value.group_averages);
   return {
-    labels: Object.keys(stats.value.group_averages),
-    datasets: [{
-      label: 'Malus moyen',
-      data: Object.values(stats.value.group_averages) as number[],
-      backgroundColor: '#3498db',
-      borderRadius: 4
-    }]
+    labels: labels,
+    datasets: [
+      { label: 'Score Initial', data: labels.map(l => stats.value.group_averages[l].Initial), backgroundColor: '#e74c3c', borderRadius: 4 },
+      { label: 'Score Final', data: labels.map(l => stats.value.group_averages[l].Final), backgroundColor: '#3498db', borderRadius: 4 }
+    ]
   };
 });
 
-// 3. Moyennes par Promo.
+// 3. Moyennes par Promo (Double Barre).
 const promoChartData = computed(() => {
   if (!stats.value?.promo_averages) return { labels: [], datasets: [] };
+  const labels = Object.keys(stats.value.promo_averages);
   return {
-    labels: Object.keys(stats.value.promo_averages),
-    datasets: [{
-      label: 'Malus moyen',
-      data: Object.values(stats.value.promo_averages) as number[],
-      backgroundColor: ['#9b59b6', '#8e44ad'],
-      borderRadius: 4
-    }]
+    labels: labels,
+    datasets: [
+      { label: 'Score Initial', data: labels.map(l => stats.value.promo_averages[l].Initial), backgroundColor: '#e74c3c', borderRadius: 4 },
+      { label: 'Score Final', data: labels.map(l => stats.value.promo_averages[l].Final), backgroundColor: '#9b59b6', borderRadius: 4 }
+    ]
   };
 });
 
-// 4. Motivation (Autonomie vs Jalons).
+// 4. Motivation (Double Barre).
 const motivationChartData = computed(() => {
   if (!stats.value?.comparison_motivation) return { labels: [], datasets: [] };
+  const labels = Object.keys(stats.value.comparison_motivation);
   return {
-    labels: Object.keys(stats.value.comparison_motivation),
-    datasets: [{
-      label: 'Malus moyen',
-      data: Object.values(stats.value.comparison_motivation) as number[],
-      backgroundColor: ['#e67e22', '#d35400', '#f39c12'],
-      borderRadius: 4
-    }]
+    labels: labels,
+    datasets: [
+      { label: 'Score Initial', data: labels.map(l => stats.value.comparison_motivation[l].Initial), backgroundColor: '#e74c3c', borderRadius: 4 },
+      { label: 'Score Final', data: labels.map(l => stats.value.comparison_motivation[l].Final), backgroundColor: '#f39c12', borderRadius: 4 }
+    ]
   };
 });
 
-// 5. Outils (Voltaire vs Écri+).
+// 5. Outils (Double Barre Horizontale).
 const toolChartData = computed(() => {
   if (!stats.value?.comparison_tool) return { labels: [], datasets: [] };
+  const labels = Object.keys(stats.value.comparison_tool);
   return {
-    labels: Object.keys(stats.value.comparison_tool),
-    datasets: [{
-      label: 'Malus moyen',
-      data: Object.values(stats.value.comparison_tool) as number[],
-      backgroundColor: ['#2ecc71', '#27ae60'],
-      borderRadius: 4
-    }]
+    labels: labels,
+    datasets: [
+      { label: 'Score Initial', data: labels.map(l => stats.value.comparison_tool[l].Initial), backgroundColor: '#e74c3c', borderRadius: 4 },
+      { label: 'Score Final', data: labels.map(l => stats.value.comparison_tool[l].Final), backgroundColor: '#2ecc71', borderRadius: 4 }
+    ]
   };
 });
 
-// 6. Humain vs Robot.
+// 6. Humain vs Robot (Double Barre Horizontale).
 const humanRobotChartData = computed(() => {
   if (!stats.value?.comparison_human_robot) return { labels: [], datasets: [] };
+  const labels = Object.keys(stats.value.comparison_human_robot);
   return {
-    labels: Object.keys(stats.value.comparison_human_robot),
-    datasets: [{
-      label: 'Malus moyen',
-      data: Object.values(stats.value.comparison_human_robot) as number[],
-      backgroundColor: ['#34495e', '#2c3e50'],
-      borderRadius: 4
-    }]
+    labels: labels,
+    datasets: [
+      { label: 'Score Initial', data: labels.map(l => stats.value.comparison_human_robot[l].Initial), backgroundColor: '#e74c3c', borderRadius: 4 },
+      { label: 'Score Final', data: labels.map(l => stats.value.comparison_human_robot[l].Final), backgroundColor: '#34495e', borderRadius: 4 }
+    ]
   };
 });
 
@@ -200,30 +195,14 @@ const humanRobotChartData = computed(() => {
 const pieOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: { 
-    legend: { 
-      position: 'bottom' as const 
-    } 
-  }
+  plugins: { legend: { position: 'bottom' as const } }
 };
 
 const barOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: { 
-    legend: { 
-      display: false 
-    } 
-  },
-  scales: { 
-    y: { 
-      beginAtZero: true, 
-      title: { 
-        display: true, 
-        text: 'Points de Malus' 
-      } 
-    } 
-  }
+  plugins: { legend: { display: true, position: 'bottom' as const } },
+  scales: { y: { beginAtZero: true, title: { display: true, text: 'Points de Malus' } } }
 };
 
 // Options pour graphiques en barres horizontales.
@@ -231,20 +210,8 @@ const horizontalBarOptions = {
   responsive: true,
   maintainAspectRatio: false,
   indexAxis: 'y' as const, 
-  plugins: { 
-    legend: { 
-      display: false 
-    } 
-  },
-  scales: { 
-    x: { 
-      beginAtZero: true, 
-      title: { 
-        display: true, 
-        text: 'Points de Malus' 
-      } 
-    } 
-  }
+  plugins: { legend: { display: true, position: 'bottom' as const } },
+  scales: { x: { beginAtZero: true, title: { display: true, text: 'Points de Malus' } } }
 };
 </script>
 
@@ -334,6 +301,6 @@ const horizontalBarOptions = {
 }
 
 .compare-card .chart-wrapper { 
-  height: 160px; 
+  height: 200px; 
 }
 </style>
