@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Dictation, Student } from '@/types';
+import type { Dictation, Student, StudentCreate, SubmissionCreate } from '@/types';
 
 const apiClient = axios.create({
     baseURL: 'http://localhost:8000/api',
@@ -41,6 +41,10 @@ export default {
     }) {
         return apiClient.post('/submissions', payload);
     },
+    async createBulkSubmissions(submissions: SubmissionCreate[]) {
+        const response = await apiClient.post('/api/submissions/bulk', submissions);
+        return response.data;
+    },
 
     getGradingScales() {
         return apiClient.get('/grading-scales');
@@ -65,6 +69,10 @@ export default {
     },
     getStudentProgression() {
         return apiClient.get('/students/stats/progression');
+    },
+    async createStudent(studentData: StudentCreate) {
+        const response = await apiClient.post('/api/students/', studentData);
+        return response.data;
     },
     deleteStudent(studentId: string) {
         return apiClient.delete(`/students/${studentId}`);

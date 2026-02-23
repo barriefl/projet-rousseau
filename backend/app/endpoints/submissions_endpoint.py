@@ -60,6 +60,71 @@ def create_submission(sub_in: SubmissionCreate, session: Session = Depends(get_s
 
     return {"message": "Dictée importée et analysée avec succès !", "submission_id": submission.id}
 
+@router.post("/bulk", response_model=List[SubmissionResponse], status_code=status.HTTP_201_CREATED)
+def create_bulk_submissions(submissions_in: List[SubmissionCreate], session: Session = Depends(get_session)):
+    """Importe plusieurs copies d'un coup pour éviter de saturer le serveur."""
+    lt_host_docker = "languagetool"
+    lt_host_windows = "host.docker.internal"
+    lt_url = "http://127.0.0.1:8010/v2/check"
+
+    try:
+        socket.gethostbyname(lt_host_docker)
+        lt_url = f"http://{lt_host_docker}:8081/v2/check"
+    except socket.gaierror:
+        try:
+            socket.gethostbyname(lt_host_windows)
+            lt_url = f"http://{lt_host_windows}:8010/v2/check"
+        except socket.gaierror:
+            pass
+
+    correction_service = CorrectionService(session, lt_url=lt_url)
+    
+    student_uuids = [sub.student_uuid for sub in submissions_in]
+    students_db = session.exec(select(Student).where(Student.anonymous_id.in_(student_uuids))).all()
+    student_map = {s.anonymous_id: s.id for s in students_db}
+
+    created_submissions = []
+
+    for sub_in in submissions_in:
+        student_id = student_map.get(sub_in.student_uuid)
+        if not student_id:
+            continue
+
+        new_submission = Submission(
+            student_id=student_id,
+            dictation_id=sub_in.dictation_id,
+            content_student=sub_in.content_student,
+            assessment_type=sub_in.assessment_type,
+            final_score=0.0,
+            scores={}
+        )
+        session.add(new_submission)
+        session.flush()
+
+        try:
+            correction_service.correct_submission(new_submission)
+        except Exception as e:
+            print(f"⚠️ Erreur de correction pour l'étudiant ID {student_id}: {e}")
+
+        created_submissions.append((new_submission, sub_in.student_uuid))
+        
+    session.commit()
+    
+    result = []
+    for sub, s_uuid in created_submissions:
+        session.refresh(sub)
+        result.append({
+            "id": sub.id,
+            "student_uuid": s_uuid,
+            "dictation_id": sub.dictation_id,
+            "content_student": sub.content_student,
+            "assessment_type": sub.assessment_type,
+            "final_score": sub.final_score,
+            "scores": sub.scores
+        })
+        
+    return result
+
 @router.get("/", response_model=List[SubmissionResponse], status_code=status.HTTP_200_OK)
 def get_all_submissions(student_uuid: Optional[str] = None, session: Session = Depends(get_session)):
     

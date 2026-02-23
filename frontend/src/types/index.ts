@@ -1,3 +1,8 @@
+export enum AssessmentType {
+  INITIAL = "INITIAL",
+  FINAL = "FINAL"
+}
+
 export interface Mistake {
     id?: number
     student_word: string;
@@ -18,6 +23,13 @@ export interface Submission {
     mistakes: Mistake[];
 }
 
+export interface SubmissionCreate {
+  student_uuid: string;
+  dictation_id: number;
+  content_student: string;
+  assessment_type: AssessmentType | string;
+}
+
 export interface CorrectionPayload {
     student_id: number;
     dictation_id: number;
@@ -31,6 +43,13 @@ export interface Student {
     last_name: string;
     promo: string;
     group: string;
+}
+
+export interface StudentCreate {
+  first_name: string;
+  last_name: string;
+  promo?: string;
+  group?: string;
 }
 
 export interface Dictation {

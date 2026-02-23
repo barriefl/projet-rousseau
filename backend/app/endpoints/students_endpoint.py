@@ -4,8 +4,8 @@ from typing import List
 
 from app.database import get_session
 from app.models import Student
-from app.schemas.students_schema import StudentProgressionResponse, StudentResponse
-from app.utils.crypto import decrypt_text
+from app.schemas.student_schema import StudentCreate, StudentProgressionResponse, StudentResponse
+from app.utils.crypto import decrypt_text, encrypt_text
 
 import uuid
 
@@ -114,4 +114,31 @@ def get_student_by_id(student_uuid: uuid.UUID, session: Session = Depends(get_se
         "last_name": nom_clair,
         "promo": student.promo,
         "group": groupe_clair
+    }
+
+@router.post("/", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
+def create_student(student_in: StudentCreate, session: Session = Depends(get_session)):
+    """Crée un nouvel étudiant à la volée (ex: lors de l'import d'une copie inconnue)."""
+    
+    prenom_enc = encrypt_text(student_in.first_name)
+    nom_enc = encrypt_text(student_in.last_name)
+    
+    new_student = Student(
+        anonymous_id=uuid.uuid4(),
+        first_name_encrypted=prenom_enc,
+        last_name_encrypted=nom_enc,
+        promo=student_in.promo,
+        group=student_in.group
+    )
+    
+    session.add(new_student)
+    session.commit()
+    session.refresh(new_student)
+    
+    return {
+        "id": new_student.anonymous_id,
+        "first_name": student_in.first_name,
+        "last_name": student_in.last_name,
+        "promo": new_student.promo,
+        "group": new_student.group.value if new_student.group else None
     }
