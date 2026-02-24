@@ -115,6 +115,7 @@ def create_bulk_submissions(submissions_in: List[SubmissionCreate], session: Ses
         session.refresh(sub)
         result.append({
             "id": sub.id,
+            "created_at": sub.created_at.isoformat(),
             "student_uuid": s_uuid,
             "dictation_id": sub.dictation_id,
             "content_student": sub.content_student,

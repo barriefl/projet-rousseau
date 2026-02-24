@@ -198,7 +198,8 @@ class CorrectionService:
                 self.lt_api_url,
                 data={
                     "text": text,
-                    "language": "fr",
+                    "language": "fr-FR",
+                    "level": "picky",
                     "enabledOnly": "false"
                 },
                 timeout=20
@@ -294,7 +295,9 @@ class CorrectionService:
             
             html_text = html_text[:start] + span + html_text[end:]
 
-        return html_text.replace('\n', '<br>')
+        clean_text = html_text.replace('\r\n', '\n').replace('\r', '\n')
+
+        return clean_text.replace('\n', '<br>')
     
     def _get_penalty_for_scale(self, scale: GradingScale, dictation: Dictation) -> float:
         """Récupère la pénalité depuis la config de la dictée, ou la globale par défaut."""
