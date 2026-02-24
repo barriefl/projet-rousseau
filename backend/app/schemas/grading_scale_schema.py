@@ -31,3 +31,9 @@ class GradingScaleWithRules(BaseModel):
 
     class Config:
         from_attributes = True
+
+class GradingScaleUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    type_rousseau: Optional[MistakeType] = None
+    penalty: Optional[float] = None

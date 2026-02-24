@@ -55,6 +55,10 @@ export default {
     deleteGradingScale(scaleId: number) {
         return apiClient.delete(`/grading-scales/${scaleId}`);
     },
+    async updateGradingScale(scaleId: number, scaleData: any) {
+        const response = await apiClient.patch(`/grading-scales/${scaleId}`, scaleData); 
+        return response.data;
+    },
 
     getUnclassifiedRules() {
         return apiClient.get('/rules/unclassified');

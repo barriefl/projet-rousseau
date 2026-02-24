@@ -383,14 +383,22 @@ const closeModal = () => { isModalOpen.value = false; };
 
 const saveTypology = async () => {
   isSaving.value = true;
+
+  const payload = {
+    ...currentTypo.value,
+    description: currentTypo.value.description === '' ? null : currentTypo.value.description
+  };
+
   try {
     if (modalMode.value === 'edit') {
-      // await api.updateGradingScale(currentTypo.value.id, currentTypo.value);
+      await api.updateGradingScale(currentTypo.value.id, currentTypo.value);
     } else {
       await api.createGradingScale(currentTypo.value);
     }
+
     await loadData();
     closeModal();
+    
   } catch (error) {
     console.error("Erreur sauvegarde :", error);
   } finally {

@@ -4,7 +4,7 @@ from typing import List
 
 from app.database import get_session
 from app.models import GradingScale
-from app.schemas.grading_scale_schema import GradingScaleCreate, GradingScaleResponse, GradingScaleWithRules
+from app.schemas.grading_scale_schema import GradingScaleCreate, GradingScaleResponse, GradingScaleUpdate, GradingScaleWithRules
 
 router = APIRouter()
 
@@ -64,3 +64,25 @@ def delete_grading_scale(scale_id: int, session: Session = Depends(get_session))
     session.delete(scale)
     session.commit()
     return
+
+@router.patch("/{scale_id}", response_model=GradingScaleResponse, status_code=status.HTTP_200_OK)
+def update_grading_scale(scale_id: int, scale_in: GradingScaleUpdate, session: Session = Depends(get_session)):
+    """Met à jour une typologie (barème) existante."""
+    
+    scale = session.get(GradingScale, scale_id)
+    if not scale:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Typologie introuvable."
+        )
+        
+    update_data = scale_in.model_dump(exclude_unset=True)
+    
+    for key, value in update_data.items():
+        setattr(scale, key, value)
+        
+    session.add(scale)
+    session.commit()
+    session.refresh(scale)
+    
+    return scale

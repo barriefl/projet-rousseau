@@ -655,7 +655,7 @@ def seed_grading_scales(session: Session, stats: ImportStats, dry_run: bool):
         {
             "name": "Erreurs d'accents et de cédilles", 
             "description": "Absence ou mauvaises utilisation des accents (ex : é/è/ê), absence ou mauvaise utilisation de la cédille (ex : ç).",
-            "type_rousseau": MistakeType.R,
+            "type_rousseau": MistakeType.D,
             "penalty": 1.0,
             "patterns": []
         },
