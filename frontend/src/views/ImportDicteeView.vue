@@ -71,6 +71,7 @@
 
             <div v-if="fileItem.status === 'MATCHED' || fileItem.status === 'CONFIRMED'" class="file-action success">
               ✅ Associé à <strong>{{ getStudentName(fileItem.studentId) }}</strong>
+              <button class="btn btn-sm btn-outline" style="margin-left: auto;" @click="openCreateStudentForm(fileItem)">➕ Créer un autre étudiant</button>
             </div>
 
             <div v-if="fileItem.status === 'SUGGESTED'" class="file-action warning">
@@ -84,7 +85,7 @@
             <div v-if="fileItem.status === 'UNKNOWN'" class="file-action danger">
               ❌ Aucun étudiant trouvé.
               <div class="btn-group">
-                <button class="btn btn-sm btn-primary" @click="createNewStudent(fileItem)">➕ Créer étudiant</button>
+                <button class="btn btn-sm btn-primary" @click="openCreateStudentForm(fileItem)">➕ Créer étudiant</button>
                 <button class="btn btn-sm btn-outline" @click="ignoreFile(fileItem)">Ignorer fichier</button>
               </div>
             </div>
@@ -121,6 +122,132 @@
       </div>
     </div>
   </div>
+
+  <div class="modal-overlay" v-if="showCreateModal" @click.self="closeCreateModal">
+      <div class="modal large-modal">
+        <h2 style="color: var(--primary); margin-bottom: 20px;">Créer un nouvel étudiant</h2>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nom *</label>
+            <input type="text" v-model="newStudentForm.last_name" required>
+          </div>
+          <div class="form-group">
+            <label>Prénom *</label>
+            <input type="text" v-model="newStudentForm.first_name" required>
+          </div>
+          <div class="form-group">
+            <label>Promo</label>
+            <input type="text" v-model="newStudentForm.promo">
+          </div>
+          <div class="form-group">
+            <label>Groupe</label>
+            <select v-model="newStudentForm.group">
+              <option value="">-- Sélectionner --</option>
+              <option value="G0">G0</option>
+              <option value="G1">G1</option>
+              <option value="G2">G2</option>
+              <option value="G3">G3</option>
+              <option value="G4">G4</option>
+              <option value="G5">G5</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Niveau d'appétence (1-4)</label>
+            <input type="number" v-model="newStudentForm.appetence_level" min="1" max="4">
+          </div>
+          <div class="form-group">
+            <label>A une bibliothèque ?</label>
+            <select v-model="newStudentForm.has_library">
+              <option value="">-- Sélectionner --</option>
+              <option value="Oui">Oui</option>
+              <option value="Non">Non</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Support de lecture</label>
+            <select v-model="newStudentForm.reading_support">
+              <option value="">-- Sélectionner --</option>
+              <option value="Ecran">Ecran</option>
+              <option value="Papier">Papier</option>
+              <option value="Beaucoup écran - un peu papier">Beaucoup écran - un peu papier</option>
+              <option value="Beaucoup papier - un peu écran">Beaucoup papier - un peu écran</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Œuvres lues</label>
+            <input type="text" v-model="newStudentForm.reading_works">
+          </div>
+          <div class="form-group">
+            <label>Motif</label>
+            <input type="text" v-model="newStudentForm.motive">
+          </div>
+          <div class="form-group">
+            <label>Niveau déclaré</label>
+            <input type="text" v-model="newStudentForm.declared_level">
+          </div>
+          <div class="form-group">
+            <label>Diplôme Parent 1</label>
+            <select v-model="newStudentForm.parent_1_degree">
+              <option value="">-- Sélectionner --</option>
+              <option value="Aucun">Aucun</option>
+              <option value="CAP BEP BP">CAP BEP BP</option>
+              <option value="Bac">Bac</option>
+              <option value="Bac+2 BTS Licence">Bac+2 BTS Licence</option>
+              <option value="Bac+4 Master Doctorat">Bac+4 Master Doctorat</option>
+              <option value="Autres">Autres</option>
+              <option value="Je ne sais pas">Je ne sais pas</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>CSP Parent 1</label>
+            <select v-model="newStudentForm.parent_1_csp">
+              <option value="">-- Sélectionner --</option>
+              <option value="Agriculteurs exploitants">Agriculteurs exploitants</option>
+              <option value="Artisans, commerçants, chefs entreprise">Artisans, commerçants, chefs entreprise</option>
+              <option value="Cadres, professions intellectuelles sup.">Cadres, professions intellectuelles sup.</option>
+              <option value="Employés / ouvriers">Employés / ouvriers</option>
+              <option value="Retraités">Retraités</option>
+              <option value="Autres sans activité professionnelle">Autres sans activité professionnelle</option>
+              <option value="Je ne sais pas">Je ne sais pas</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Diplôme Parent 2</label>
+            <select v-model="newStudentForm.parent_2_degree">
+              <option value="">-- Sélectionner --</option>
+              <option value="Aucun">Aucun</option>
+              <option value="CAP BEP BP">CAP BEP BP</option>
+              <option value="Bac">Bac</option>
+              <option value="Bac+2 BTS Licence">Bac+2 BTS Licence</option>
+              <option value="Bac+4 Master Doctorat">Bac+4 Master Doctorat</option>
+              <option value="Autres">Autres</option>
+              <option value="Je ne sais pas">Je ne sais pas</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>CSP Parent 2</label>
+            <select v-model="newStudentForm.parent_2_csp">
+              <option value="">-- Sélectionner --</option>
+              <option value="Agriculteurs exploitants">Agriculteurs exploitants</option>
+              <option value="Artisans, commerçants, chefs entreprise">Artisans, commerçants, chefs entreprise</option>
+              <option value="Cadres, professions intellectuelles sup.">Cadres, professions intellectuelles sup.</option>
+              <option value="Employés / ouvriers">Employés / ouvriers</option>
+              <option value="Retraités">Retraités</option>
+              <option value="Autres sans activité professionnelle">Autres sans activité professionnelle</option>
+              <option value="Je ne sais pas">Je ne sais pas</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 25px;">
+          <button class="btn btn-outline" @click="closeCreateModal">Annuler</button>
+          <button class="btn btn-primary" @click="confirmCreateStudent" :disabled="!newStudentForm.first_name || !newStudentForm.last_name">
+            Enregistrer et associer
+          </button>
+        </div>
+      </div>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -164,6 +291,16 @@ const fileInputRef = ref<HTMLInputElement | null>(null);
 const importProgress = ref(0);
 const processedCount = ref(0);
 const totalToProcess = ref(0);
+
+// États pour le formulaire.
+const showCreateModal = ref(false);
+const editingFileItem = ref<ParsedFile | null>(null);
+
+const newStudentForm = ref({
+  first_name: '', last_name: '', promo: '', group: '', appetence_level: '',
+  has_library: '', reading_support: '', reading_works: '', motive: '',
+  parent_1_degree: '', parent_1_csp: '', parent_2_degree: '', parent_2_csp: '', declared_level: ''
+});
 
 // --- CHARGEMENT. ---
 onMounted(async () => {
@@ -300,25 +437,46 @@ const reprocessFile = (fileItem: ParsedFile) => {
   findMatchForFile(fileItem); 
 };
 
-const createNewStudent = async (fileItem: ParsedFile) => {
+const openCreateStudentForm = (fileItem: ParsedFile) => {
+  editingFileItem.value = fileItem;
   const parts = fileItem.parsedName.split(' ');
-  const presumedLastName = parts[0]?.toUpperCase() || 'INCONNU';
-  const presumedFirstName = parts.slice(1).join(' ') || 'Inconnu';
+  
+  newStudentForm.value = {
+    first_name: parts.slice(1).join(' ') || '',
+    last_name: parts[0]?.toUpperCase() || '',
+    promo: '', group: '', appetence_level: '', has_library: '',
+    reading_support: '', reading_works: '', motive: '',
+    parent_1_degree: '', parent_1_csp: '', parent_2_degree: '', parent_2_csp: '', declared_level: ''
+  };
+  
+  showCreateModal.value = true;
+};
 
-  const confirmCreate = confirm(`Voulez-vous créer l'étudiant : ${presumedLastName} ${presumedFirstName} ?`);
-  if (!confirmCreate) return;
+const closeCreateModal = () => {
+  showCreateModal.value = false;
+  editingFileItem.value = null;
+};
+
+const confirmCreateStudent = async () => {
+  if (!editingFileItem.value || !newStudentForm.value.first_name || !newStudentForm.value.last_name) return;
 
   try {
-    const newStudent = await api.createStudent({ 
-      first_name: presumedFirstName, 
-      last_name: presumedLastName 
-    });
+    const dataToSend = Object.fromEntries(
+      Object.entries(newStudentForm.value).map(([k, v]) => {
+        if (v === '') return [k, null];
+        if (k === 'appetence_level' && v !== null) return [k, String(v)];
+        return [k, v];
+      })
+    );
+
+    const newStudent = await api.createStudent(dataToSend as any);
     
     students.value.push(newStudent);
     
-    fileItem.status = 'CONFIRMED';
-    fileItem.studentId = newStudent.id;
+    editingFileItem.value.status = 'CONFIRMED';
+    editingFileItem.value.studentId = newStudent.id;
 
+    closeCreateModal();
   } catch (error) {
     console.error("Erreur de création :", error);
     alert("Impossible de créer l'étudiant. Vérifiez votre backend.");
@@ -603,6 +761,52 @@ const submitAll = async () => {
 .warning-text { 
   color: #e67e22; 
   font-weight: bold; 
+}
+
+/* --- Modale Étudiant. --- */
+.modal-overlay { 
+  position: fixed; 
+  top: 0; left: 0; right: 0; bottom: 0; 
+  background: rgba(0,0,0,0.6); 
+  z-index: 1000; 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+}
+.modal { 
+  background: white; 
+  padding: 30px; 
+  border-radius: 8px; 
+  width: 500px; 
+  max-width: 90%; 
+  max-height: 90vh; 
+  overflow-y: auto; 
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
+}
+.large-modal {
+  width: 700px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+.form-group input, .form-group select { 
+  width: 100%; 
+  padding: 8px 12px; 
+  border: 1px solid #ccc; 
+  border-radius: 4px; 
+  font-family: inherit; 
+  box-sizing: border-box;
+}
+.form-group select {
+  cursor: pointer;
+  background-color: white;
+}
+.modal-actions { 
+  display: flex; 
+  justify-content: flex-end; 
+  gap: 10px; 
 }
 
 /* Barre de progression. */

@@ -11,6 +11,10 @@ import uuid
 
 router = APIRouter()
 
+def _get_val(field):
+    """Fonction utilitaire pour extraire la valeur d'un Enum proprement s'il existe."""
+    return field.value if field and hasattr(field, 'value') else field
+
 @router.get("/", response_model=List[StudentResponse])
 def get_students(session: Session = Depends(get_session)):
     """Récupère la liste de tous les étudiants avec leurs noms déchiffrés."""
@@ -30,7 +34,17 @@ def get_students(session: Session = Depends(get_session)):
             "first_name": prenom_clair,
             "last_name": nom_clair,
             "promo": s.promo,
-            "group": groupe_clair
+            "group": _get_val(s.group),
+            "appetence_level": _get_val(s.appetence_level),
+            "has_library": _get_val(s.has_library),
+            "reading_support": _get_val(s.reading_support),
+            "reading_works": _get_val(s.reading_works),
+            "motive": _get_val(s.motive),
+            "parent_1_degree": _get_val(s.parent_1_degree),
+            "parent_1_csp": _get_val(s.parent_1_csp),
+            "parent_2_degree": _get_val(s.parent_2_degree),
+            "parent_2_csp": _get_val(s.parent_2_csp),
+            "declared_level": _get_val(s.declared_level)
         })
         
     return result
@@ -106,19 +120,28 @@ def get_student_by_id(student_uuid: uuid.UUID, session: Session = Depends(get_se
         
     prenom_clair = decrypt_text(student.first_name_encrypted) or "Inconnu"
     nom_clair = decrypt_text(student.last_name_encrypted) or "Inconnu"
-    groupe_clair = student.group.value if student.group else None
     
     return {
         "id": student.anonymous_id,
         "first_name": prenom_clair,
         "last_name": nom_clair,
         "promo": student.promo,
-        "group": groupe_clair
+        "group": _get_val(student.group),
+        "appetence_level": _get_val(student.appetence_level),
+        "has_library": _get_val(student.has_library),
+        "reading_support": _get_val(student.reading_support),
+        "reading_works": _get_val(student.reading_works),
+        "motive": _get_val(student.motive),
+        "parent_1_degree": _get_val(student.parent_1_degree),
+        "parent_1_csp": _get_val(student.parent_1_csp),
+        "parent_2_degree": _get_val(student.parent_2_degree),
+        "parent_2_csp": _get_val(student.parent_2_csp),
+        "declared_level": _get_val(student.declared_level)
     }
 
 @router.post("/", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
 def create_student(student_in: StudentCreate, session: Session = Depends(get_session)):
-    """Crée un nouvel étudiant à la volée (ex: lors de l'import d'une copie inconnue)."""
+    """Crée un nouvel étudiant avec toutes ses données sociodémographiques."""
     
     prenom_enc = encrypt_text(student_in.first_name)
     nom_enc = encrypt_text(student_in.last_name)
@@ -128,7 +151,17 @@ def create_student(student_in: StudentCreate, session: Session = Depends(get_ses
         first_name_encrypted=prenom_enc,
         last_name_encrypted=nom_enc,
         promo=student_in.promo,
-        group=student_in.group
+        group=student_in.group,
+        appetence_level=student_in.appetence_level,
+        has_library=student_in.has_library,
+        reading_support=student_in.reading_support,
+        reading_works=student_in.reading_works,
+        motive=student_in.motive,
+        parent_1_degree=student_in.parent_1_degree,
+        parent_1_csp=student_in.parent_1_csp,
+        parent_2_degree=student_in.parent_2_degree,
+        parent_2_csp=student_in.parent_2_csp,
+        declared_level=student_in.declared_level
     )
     
     session.add(new_student)
@@ -140,5 +173,15 @@ def create_student(student_in: StudentCreate, session: Session = Depends(get_ses
         "first_name": student_in.first_name,
         "last_name": student_in.last_name,
         "promo": new_student.promo,
-        "group": new_student.group.value if new_student.group else None
+        "group": _get_val(new_student.group),
+        "appetence_level": _get_val(new_student.appetence_level),
+        "has_library": _get_val(new_student.has_library),
+        "reading_support": _get_val(new_student.reading_support),
+        "reading_works": _get_val(new_student.reading_works),
+        "motive": _get_val(new_student.motive),
+        "parent_1_degree": _get_val(new_student.parent_1_degree),
+        "parent_1_csp": _get_val(new_student.parent_1_csp),
+        "parent_2_degree": _get_val(new_student.parent_2_degree),
+        "parent_2_csp": _get_val(new_student.parent_2_csp),
+        "declared_level": _get_val(new_student.declared_level)
     }
