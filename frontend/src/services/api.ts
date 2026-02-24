@@ -77,6 +77,10 @@ export default {
         const response = await apiClient.post('/students/', studentData);
         return response.data;
     },
+    async updateStudent(studentId: string, studentData: any) {
+        const response = await apiClient.patch(`/students/${studentId}`, studentData);
+        return response.data;
+    },
     deleteStudent(studentId: string) {
         return apiClient.delete(`/students/${studentId}`);
     }

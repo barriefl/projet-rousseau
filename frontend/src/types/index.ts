@@ -43,8 +43,18 @@ export interface Student {
     id: string;
     first_name: string;
     last_name: string;
-    promo: string;
-    group: string;
+    promo?: string | null;
+    group?: string | null;
+    appetence_level?: string | null;
+    has_library?: string | null;
+    reading_support?: string | null;
+    reading_works?: string | null;
+    motive?: string | null;
+    declared_level?: string | null;
+    parent_1_degree?: string | null;
+    parent_1_csp?: string | null;
+    parent_2_degree?: string | null;
+    parent_2_csp?: string | null;
 }
 
 export interface StudentCreate {

@@ -4,7 +4,7 @@ from typing import List
 
 from app.database import get_session
 from app.models import Student
-from app.schemas.student_schema import StudentCreate, StudentProgressionResponse, StudentResponse
+from app.schemas.student_schema import StudentCreate, StudentProgressionResponse, StudentResponse, StudentUpdate
 from app.utils.crypto import decrypt_text, encrypt_text
 
 import uuid
@@ -184,4 +184,55 @@ def create_student(student_in: StudentCreate, session: Session = Depends(get_ses
         "parent_2_degree": _get_val(new_student.parent_2_degree),
         "parent_2_csp": _get_val(new_student.parent_2_csp),
         "declared_level": _get_val(new_student.declared_level)
+    }
+
+@router.patch("/{student_uuid}", response_model=StudentResponse, status_code=status.HTTP_200_OK)
+def update_student(student_uuid: uuid.UUID, student_in: StudentUpdate, session: Session = Depends(get_session)):
+    """Met à jour les informations d'un étudiant existant."""
+    
+    statement = select(Student).where(Student.anonymous_id == student_uuid)
+    db_student = session.exec(statement).first()
+    
+    if not db_student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Étudiant introuvable."
+        )
+        
+    update_data = student_in.model_dump(exclude_unset=True)
+    
+    if "first_name" in update_data and update_data["first_name"] is not None:
+        db_student.first_name_encrypted = encrypt_text(update_data["first_name"])
+        del update_data["first_name"]
+        
+    if "last_name" in update_data and update_data["last_name"] is not None:
+        db_student.last_name_encrypted = encrypt_text(update_data["last_name"])
+        del update_data["last_name"]
+        
+    for key, value in update_data.items():
+        setattr(db_student, key, value)
+        
+    session.add(db_student)
+    session.commit()
+    session.refresh(db_student)
+    
+    prenom_clair = decrypt_text(db_student.first_name_encrypted) or "Inconnu"
+    nom_clair = decrypt_text(db_student.last_name_encrypted) or "Inconnu"
+    
+    return {
+        "id": db_student.anonymous_id,
+        "first_name": prenom_clair,
+        "last_name": nom_clair,
+        "promo": db_student.promo,
+        "group": _get_val(db_student.group),
+        "appetence_level": _get_val(db_student.appetence_level),
+        "has_library": _get_val(db_student.has_library),
+        "reading_support": _get_val(db_student.reading_support),
+        "reading_works": _get_val(db_student.reading_works),
+        "motive": _get_val(db_student.motive),
+        "parent_1_degree": _get_val(db_student.parent_1_degree),
+        "parent_1_csp": _get_val(db_student.parent_1_csp),
+        "parent_2_degree": _get_val(db_student.parent_2_degree),
+        "parent_2_csp": _get_val(db_student.parent_2_csp),
+        "declared_level": _get_val(db_student.declared_level)
     }

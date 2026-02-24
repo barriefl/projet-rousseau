@@ -43,3 +43,19 @@ class StudentCreate(BaseModel):
     parent_2_degree: Optional[str] = None
     parent_2_csp: Optional[str] = None
     declared_level: Optional[str] = None
+
+class StudentUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    promo: Optional[str] = None
+    group: Optional[str] = None
+    appetence_level: Optional[str] = None
+    has_library: Optional[str] = None
+    reading_support: Optional[str] = None
+    reading_works: Optional[str] = None
+    motive: Optional[str] = None
+    parent_1_degree: Optional[str] = None
+    parent_1_csp: Optional[str] = None
+    parent_2_degree: Optional[str] = None
+    parent_2_csp: Optional[str] = None
+    declared_level: Optional[str] = None
