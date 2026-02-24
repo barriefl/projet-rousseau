@@ -63,6 +63,9 @@ export default {
     updateRule(ruleId: number, payload: any) {
         return apiClient.patch(`/rules/${ruleId}`, payload);
     },
+    updateDictationRules(dictationId: number, rulesConfig: Record<string, number>) {
+        return apiClient.patch(`/dictations/${dictationId}/rules`, { rules_config: rulesConfig });
+    },
 
     getStudents() {
         return apiClient.get<Student[]>('/students');

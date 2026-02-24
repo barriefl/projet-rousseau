@@ -65,6 +65,9 @@
           :style="{ top: tooltip.y + 'px', left: tooltip.x + 'px' }"
         >
           <h5>Type {{ tooltip.type }} <span style="color:#e74c3c">+{{ tooltip.malus }} pt</span></h5>
+          <div v-if="tooltip.ruleId" style="font-size: 0.75rem; color: #95a5a6; margin-bottom: 4px; font-family: monospace;">
+            Règle : {{ tooltip.ruleId }}
+          </div>
           <div class="correction">{{ tooltip.corr || 'Aucune suggestion' }}</div>
           <div class="desc">{{ tooltip.desc }}</div>
         </div>
@@ -90,12 +93,15 @@
         
         <div class="error-list">
           <div 
-            v-for="(mistake, index) in submissionDetails.mistakes" 
+            v-for="(mistake, index) in sortedMistakes" 
             :key="index"
             class="error-item" 
             :data-type="mistake.type"
           >
             <strong>{{ mistake.word || '[Oubli]' }}</strong><br>
+            <div style="font-size: 0.75rem; color: #95a5a6; font-family: monospace; margin: 2px 0;">
+              Règle : {{ mistake.lt_rule_id || 'Non spécifiée' }}
+            </div>
             <span style="color: #555;">Correction : {{ mistake.corr || '-' }} (+{{ mistake.malus }})</span>
           </div>
         </div>
@@ -133,7 +139,12 @@ const filteredStudents = computed(() => {
 });
 
 // État de l'infobulle.
-const tooltip = ref({ visible: false, x: 0, y: 0, type: '', malus: '', corr: '', desc: '' });
+const tooltip = ref({ visible: false, x: 0, y: 0, type: '', malus: '', corr: '', desc: '', ruleId: '' });
+
+const sortedMistakes = computed(() => {
+  if (!submissionDetails.value?.mistakes) return [];
+  return [...submissionDetails.value.mistakes].sort((a, b) => a.position - b.position);
+});
 
 // --- CHARGEMENT INITIAL. ---
 onMounted(async () => {
@@ -193,7 +204,8 @@ const handleMouseOver = (event: MouseEvent) => {
       type: target.getAttribute('data-type') || 'Inconnu',
       malus: target.getAttribute('data-malus') || '0',
       corr: target.getAttribute('data-corr') || '',
-      desc: target.getAttribute('data-desc') || ''
+      desc: target.getAttribute('data-desc') || '',
+      ruleId: target.getAttribute('data-rule-id') || ''
     };
   }
 };

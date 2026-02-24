@@ -178,7 +178,9 @@ def get_submission_by_id(submission_id: int, session: Session = Depends(get_sess
                 "corr": m.correct_word,
                 "malus": m.malus_applied,
                 "type": m.type_rousseau.value if hasattr(m.type_rousseau, 'value') else m.type_rousseau,
-                "desc": m.message
+                "desc": m.message,
+                "lt_rule_id": m.rule_id_lt,
+                "position": m.position_index
             } for m in mistakes
         ]
     }

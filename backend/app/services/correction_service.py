@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Tuple
 import requests
 from sqlalchemy.orm import Session
 from sqlmodel import select
-from app.models import GradingScale, Mistake, Rule, Submission
+from app.models import Dictation, GradingScale, Mistake, Rule, Submission
 
 class CorrectionService:
     DEFAULT_LT_URL = "http://languagetool:8010/v2/check"
@@ -26,6 +26,29 @@ class CorrectionService:
 
         if not rule:
             description = match.get("message", f"Règle LT: {rule_id}")
+            rule = Rule(
+                lt_rule_id=rule_id,
+                description=description[:255],
+                is_active=True,
+                grading_scale_id=None
+            )
+            self.session.add(rule)
+            self.session.commit()
+            self.session.refresh(rule)
+
+        if not rule.is_active:
+            return None
+        
+        if rule.grading_scale_id:
+            return self.session.get(GradingScale, rule.grading_scale_id)
+        
+        return self._get_scale_by_name("Autre erreur")
+    
+    def _get_scale_for_custom_rule(self, rule_id: str, description: str) -> GradingScale:
+        """Enregistre une règle 'maison' (Fidélité) dans la base pour qu'elle apparaisse dans l'interface."""
+        rule = self.session.exec(select(Rule).where(Rule.lt_rule_id == rule_id)).first()
+
+        if not rule:
             rule = Rule(
                 lt_rule_id=rule_id,
                 description=description[:255],
@@ -91,7 +114,8 @@ class CorrectionService:
                     if is_already_caught:
                         continue
 
-                    scale = self._get_scale_by_name("Fautes de frappe ou erreur sur les lettres muettes")
+                    scale = self._get_scale_for_custom_rule("FIDELITY_SUBSTITUTION", "Mot remplacé ou mal orthographié (Fidélité)")
+                    if not scale: continue
                     
                     mistakes.append(Mistake(
                         student_word=token["text"],
@@ -108,7 +132,8 @@ class CorrectionService:
 
             # --- CAS 2 : INSERTION (AJOUT). ---
             elif tag == 'insert':
-                scale = self._get_scale_by_name("Fautes de frappe ou erreur sur les lettres muettes")
+                scale = self._get_scale_for_custom_rule("FIDELITY_ADDITION", "Mot ajouté en trop (Fidélité)")
+                if not scale: continue
                 
                 for k in range(j1, j2):
                     token = stu_tokens[k]
@@ -127,7 +152,8 @@ class CorrectionService:
 
             # --- CAS 3 : SUPPRESSION (OUBLI). ---
             elif tag == 'delete':
-                scale = self._get_scale_by_name("Fautes de frappe ou erreur sur les lettres muettes")
+                scale = self._get_scale_for_custom_rule("FIDELITY_OMISSION", "Mot manquant / oublié (Fidélité)")
+                if not scale: continue
                 
                 pos_anchor = stu_tokens[j1]["start"] if j1 < len(stu_tokens) else len(student_text)
                 
@@ -175,7 +201,7 @@ class CorrectionService:
                     "language": "fr",
                     "enabledOnly": "false"
                 },
-                timeout=5
+                timeout=20
             )
             if response.status_code == 200:
                 matches = response.json().get("matches", [])
@@ -185,15 +211,24 @@ class CorrectionService:
                     scale = self._get_scale_for_lt_match(match)
                     if not scale: continue
 
+                    replacements = [r["value"] for r in match.get("replacements", [])]
+                    best_correction = replacements[0] if replacements else ""
+
+                    if ref_text and replacements:
+                        for rep in replacements:
+                            if rep.lower() in ref_text.lower():
+                                best_correction = rep
+                                break
+
                     m = Mistake(
                         submission_id=submission.id,
-                        student_word=match["context"]["text"][match["offset"] : match["offset"] + match["length"]],
-                        correct_word=match["replacements"][0]["value"] if match["replacements"] else "",
+                        student_word=text[match["offset"] : match["offset"] + match["length"]],
+                        correct_word=best_correction,
                         position_index=match["offset"],
                         length=match["length"],
                         grading_scale_id=scale.id,
                         type_rousseau=scale.type_rousseau,
-                        malus_applied=scale.penalty,
+                        malus_applied = self._get_penalty_for_scale(scale, submission.dictation),
                         rule_id_lt=match["rule"]["id"],
                         message=match["message"],
                         context=match["context"]["text"]
@@ -253,9 +288,61 @@ class CorrectionService:
             
             desc = html.escape(m.message) if m.message else ""
             corr = html.escape(m.correct_word) if m.correct_word else ""
+            rule_id = html.escape(m.rule_id_lt) if m.rule_id_lt else "INCONNU"
             
-            span = f'<span class="faute" data-type="{m.type_rousseau}" data-malus="{m.malus_applied}" data-corr="{corr}" data-desc="{desc}">{word}</span>'
+            span = f'<span class="faute" data-type="{m.type_rousseau}" data-malus="{m.malus_applied}" data-corr="{corr}" data-desc="{desc}" data-rule-id="{rule_id}">{word}</span>'
             
             html_text = html_text[:start] + span + html_text[end:]
 
         return html_text.replace('\n', '<br>')
+    
+    def _get_penalty_for_scale(self, scale: GradingScale, dictation: Dictation) -> float:
+        """Récupère la pénalité depuis la config de la dictée, ou la globale par défaut."""
+        if dictation and dictation.rules_config:
+            return dictation.rules_config.get(scale.name, scale.penalty)
+        return scale.penalty
+
+    def recalculate_dictation_scores(self, dictation: Dictation):
+        """Ré-évalue les fautes d'une dictée selon les règles et barèmes actuels."""
+        all_rules = self.session.exec(select(Rule)).all()
+        rules_map = {r.lt_rule_id: r for r in all_rules}
+
+        all_scales = self.session.exec(select(GradingScale)).all()
+        scales_map = {s.id: s for s in all_scales}
+
+        dictation_config = dictation.rules_config or {}
+
+        for sub in dictation.submissions:
+            total_penalty = 0.0
+            scores_breakdown = {}
+
+            for m in sub.mistakes:
+                db_rule = rules_map.get(m.rule_id_lt)
+
+                if not db_rule or not db_rule.is_active:
+                    m.malus_applied = 0.0
+                    m.grading_scale_id = None
+                    continue
+
+                scale = scales_map.get(db_rule.grading_scale_id)
+                if not scale:
+                    continue
+
+                m.grading_scale_id = scale.id
+                m.type_rousseau = scale.type_rousseau
+                
+                new_penalty = dictation_config.get(scale.name, scale.penalty)
+                m.malus_applied = new_penalty
+                
+                total_penalty += new_penalty
+
+                if scale.name not in scores_breakdown:
+                    scores_breakdown[scale.name] = 0.0
+                scores_breakdown[scale.name] += new_penalty
+
+            sub.final_score = round(total_penalty, 2)
+            sub.scores = {k: round(v, 2) for k, v in scores_breakdown.items()}
+            
+            self.session.add(sub)
+        
+        self.session.commit()

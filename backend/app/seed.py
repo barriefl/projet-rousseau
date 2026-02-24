@@ -650,35 +650,35 @@ def seed_grading_scales(session: Session, stats: ImportStats, dry_run: bool):
             "description": "Substitutions, omissions, ajouts de lettres ou de mots.",
             "type_rousseau": MistakeType.D,
             "penalty": 0.5,
-            "patterns": ["misspelling", "typo", "MORFOLOGIK_RULE_FR_FR"]
+            "patterns": []
         },
         {
             "name": "Erreurs d'accents et de cédilles", 
             "description": "Absence ou mauvaises utilisation des accents (ex : é/è/ê), absence ou mauvaise utilisation de la cédille (ex : ç).",
             "type_rousseau": MistakeType.R,
             "penalty": 1.0,
-            "patterns": ["accent", "cedille"]
+            "patterns": []
         },
         {
             "name": "Erreurs de doublement", 
             "description": "Doubles consonnes ou voyelles manquantes ou superflues.",
             "type_rousseau": MistakeType.D,
             "penalty": 0.5,
-            "patterns": ["double"]
+            "patterns": []
         },
         {
             "name": "Confusions homophoniques", 
             "description": "Confondre des mots qui se prononcent de la même manière mais s'écrivent différemment (ex : a/à, et/est, ses/ces/s'est/c'est, mais/mes).",
             "type_rousseau": MistakeType.S,
             "penalty": 1.0,
-            "patterns": ["homophone", "confused_words"]
+            "patterns": []
         },
         {
             "name": "Erreurs de terminaison", 
             "description": "Mauvaise conjugaison des verbes, mauvaise formation  des adjectifs et des participes passés.",
             "type_rousseau": MistakeType.R,
             "penalty": 1.0,
-            "patterns": ["grammar", "conjugation", "agreement"]
+            "patterns": []
         },
         {
             "name": "Autre erreur",
@@ -732,6 +732,46 @@ def seed_grading_scales(session: Session, stats: ImportStats, dry_run: bool):
     if not dry_run:
         session.commit()
         logger.info(f"📏 Barèmes : {count_scales} typologies et {count_rules} règles LT créées/mises à jour.")
+
+def seed_fidelity_rules(session: Session, stats: ImportStats, dry_run: bool):
+    if dry_run:
+        return
+    
+    scale_frappe = session.exec(select(GradingScale).where(GradingScale.name == "Fautes de frappe ou erreur sur les lettres muettes")).first()
+    scale_oubli = session.exec(select(GradingScale).where(GradingScale.name == "Oubli de mots")).first()
+
+    count_rules = 0
+
+    fidelity_rules = [
+        Rule(
+            lt_rule_id="FIDELITY_SUBSTITUTION", 
+            description="Mot remplacé ou mal orthographié (Fidélité)", 
+            is_active=True, 
+            grading_scale_id=scale_frappe.id if scale_frappe else None
+        ),
+        Rule(
+            lt_rule_id="FIDELITY_ADDITION", 
+            description="Mot ajouté en trop (Fidélité)", 
+            is_active=True, 
+            grading_scale_id=scale_frappe.id if scale_frappe else None
+        ),
+        Rule(
+            lt_rule_id="FIDELITY_OMISSION", 
+            description="Mot manquant / oublié (Fidélité)", 
+            is_active=True, 
+            grading_scale_id=scale_oubli.id if scale_oubli else None
+        ),
+    ]
+
+    for r in fidelity_rules:
+        existing = session.exec(select(Rule).where(Rule.lt_rule_id == r.lt_rule_id)).first()
+        if not existing:
+            session.add(r)
+            count_rules += 1
+            
+    if not dry_run:
+        session.commit()
+        logger.info(f"📏 Règles : {count_rules} règles de base créées.")
     
 def seed_dictations(session: Session, student_service: StudentService, stats: ImportStats, dry_run: bool):
     """Import des dictées (par vague)."""
@@ -877,6 +917,7 @@ def main():
             importer.import_ecriplus()
 
             seed_grading_scales(session, stats, args.dry_run)
+            seed_fidelity_rules(session, stats, args.dry_run)
             seed_dictations(session, student_service, stats, args.dry_run)
 
             if not args.dry_run:

@@ -12,6 +12,7 @@ export interface Mistake {
     category_code: string;
     type_rousseau: 'D' | 'S' | 'R' | 'A';
     malus_applied: number;
+    rule_id_lt: string;
     message: string;
 }
 
@@ -56,6 +57,7 @@ export interface Dictation {
   id: number;
   title: string;
   content_reference: string;
+  rules_config?: Record<string, number>;
 }
 
 export interface GradingScale {
