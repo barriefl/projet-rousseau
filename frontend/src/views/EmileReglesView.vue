@@ -19,21 +19,28 @@
       </div>
       
       <div class="dictation-selector-bar">
-      <div v-if="selectedDictationId" class="save-action">
-        <button class="btn btn-success" @click="saveDictationRules" :disabled="isSavingRules">
-          {{ isSavingRules ? '⏳ Recalcul en cours...' : '💾 Sauvegarder ce barème et recalculer les notes' }}
-        </button>
+        <div v-if="selectedDictationId" class="save-action">
+          <button class="btn btn-success" @click="saveDictationRules" :disabled="isSavingRules">
+            {{ isSavingRules ? '⏳ Recalcul en cours...' : '💾 Sauvegarder ce barème et recalculer les notes' }}
+          </button>
+        </div>
+        
+        <div v-else class="save-action">
+          <button class="btn btn-primary" @click="recalculateGlobal" :disabled="isSavingRules">
+            {{ isSavingRules ? '⏳ Mise à jour en cours...' : '🔄 Sauvegarder les règles et recalculer les notes' }}
+          </button>
+        </div>
       </div>
-      
-      <div v-else class="save-action">
-        <button class="btn btn-primary" @click="recalculateGlobal" :disabled="isSavingRules">
-          {{ isSavingRules ? '⏳ Mise à jour en cours...' : '🔄 Sauvegarder les règles et recalculer les notes' }}
-        </button>
-      </div>
-    </div>
     </div>
 
-    <div class="workspace-layout" :class="{ 'dictation-mode': selectedDictationId }">
+    <div v-if="isLoading" class="loading-container">
+      <div class="loading-content">
+        <span class="spinner">⏳</span>
+        <p>Chargement des typologies et du moteur de règles...</p>
+      </div>
+    </div>
+
+    <div v-else class="workspace-layout" :class="{ 'dictation-mode': selectedDictationId }">
       
       <div 
         v-if="!selectedDictationId"
@@ -185,22 +192,21 @@
 import { ref, onMounted } from 'vue';
 import api from '@/services/api';
 
-// Assurez-vous d'avoir ce type dans votre fichier index.ts, avec rules_config ?: Record<string, number>
 import type { Dictation } from '@/types'; 
 
-// --- ÉTATS GLOBAUX ---
+// --- ÉTATS GLOBAUX. ---
 const typologies = ref<any[]>([]);
 const unclassifiedRules = ref<any[]>([]);
 const isLoading = ref(true);
 const isSaving = ref(false);
 
-// --- ÉTATS POUR LE MODE DICTÉE ---
+// --- ÉTATS POUR LE MODE DICTÉE. ---
 const dictations = ref<Dictation[]>([]);
 const selectedDictationId = ref<number | ''>('');
 const rulesConfigOverrides = ref<Record<string, number>>({});
 const isSavingRules = ref(false);
 
-// --- CHARGEMENT DES DONNÉES ---
+// --- CHARGEMENT DES DONNÉES. ---
 const loadData = async () => {
   isLoading.value = true;
   try {
@@ -222,7 +228,7 @@ const loadData = async () => {
 
 onMounted(() => { loadData(); });
 
-// --- LOGIQUE DU MODE DICTÉE ---
+// --- LOGIQUE DU MODE DICTÉE. ---
 const loadDictationRules = () => {
   if (!selectedDictationId.value) {
     rulesConfigOverrides.value = {};
@@ -233,7 +239,6 @@ const loadDictationRules = () => {
   rulesConfigOverrides.value = {};
 
   typologies.value.forEach(typo => {
-    // On extrait la valeur d'abord pour satisfaire TypeScript
     const savedPenalty = dict?.rules_config?.[typo.name];
 
     if (savedPenalty !== undefined && savedPenalty !== null) {
@@ -255,7 +260,6 @@ const saveDictationRules = async () => {
   try {
     await api.updateDictationRules(Number(selectedDictationId.value), rulesConfigOverrides.value);
     
-    // Mise à jour de la mémoire locale proprement
     const dictIndex = dictations.value.findIndex(d => d.id === selectedDictationId.value);
     const dictToUpdate = dictations.value[dictIndex];
     if (dictToUpdate) {
@@ -278,24 +282,18 @@ const recalculateGlobal = async () => {
   isSavingRules.value = true;
 
   try {
-    // On prépare une liste d'appels API pour chaque dictée
     const updatePromises = dictations.value.map(dict => {
       
-      // On reconstitue la configuration complète pour cette dictée
       const currentConfig: Record<string, number> = {};
       
       typologies.value.forEach(typo => {
-        // Si la dictée avait déjà une pénalité personnalisée pour cette typologie, on la garde.
-        // Sinon, on applique la pénalité par défaut de la typologie.
         const savedPenalty = dict.rules_config?.[typo.name];
         currentConfig[typo.name] = savedPenalty !== undefined ? savedPenalty : typo.penalty;
       });
 
-      // 🌟 On appelle VOTRE route existante pour chaque dictée
       return api.updateDictationRules(dict.id, currentConfig);
     });
 
-    // On exécute toutes les requêtes en même temps pour plus de rapidité
     await Promise.all(updatePromises);
     
     alert("✅ Toutes les règles ont été mises à jour et l'ensemble des copies recalculées !");
@@ -307,7 +305,7 @@ const recalculateGlobal = async () => {
   }
 };
 
-// --- LOGIQUE DRAG & DROP (Protégée contre le mode Dictée) ---
+// --- LOGIQUE DRAG & DROP. ---
 let draggedRule: any = null;
 let draggedSourceId: number | 'unassigned' | null = null;
 
@@ -362,11 +360,11 @@ const toggleRuleActive = async (rule: any) => {
   try {
     await api.updateRule(rule.id, { is_active: rule.is_active });
   } catch (error) {
-    rule.is_active = !rule.is_active; // Rollback
+    rule.is_active = !rule.is_active;
   }
 };
 
-// --- LOGIQUE MODAL TYPOLOGIE ---
+// --- LOGIQUE MODAL TYPOLOGIE. ---
 const isModalOpen = ref(false);
 const modalMode = ref<'create' | 'edit'>('create');
 const currentTypo = ref<any>({});
@@ -413,16 +411,45 @@ const deleteTypology = async (typo: any) => {
 </script>
 
 <style scoped>
-/* CSS de base */
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.header h1 { font-size: 1.6rem; color: var(--primary); margin: 0; }
-.btn { padding: 8px 16px; border-radius: 5px; cursor: pointer; font-weight: 500; transition: 0.2s; border: none; }
-.btn-primary { background: var(--accent); color: white; }
-.btn-success { background: #2ecc71; color: white; font-weight: bold; }
-.btn-success:hover:not(:disabled) { background: #27ae60; transform: translateY(-2px); }
-.btn-outline { background: transparent; border: 1px solid #ccc; color: var(--text); }
+/* CSS de base. */
+.header { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  margin-bottom: 20px; 
+}
+.header h1 { 
+  font-size: 1.6rem; 
+  color: var(--primary); 
+  margin: 0; 
+}
+.btn { 
+  padding: 8px 16px; 
+  border-radius: 5px; 
+  cursor: pointer; 
+  font-weight: 500; 
+  transition: 0.2s; 
+  border: none; 
+}
+.btn-primary { 
+  background: var(--accent); 
+  color: white; 
+}
+.btn-success { 
+  background: #2ecc71; 
+  color: white; 
+  font-weight: bold; 
+}
+.btn-success:hover:not(:disabled) { 
+  background: #27ae60; 
+  transform: translateY(-2px); 
+}
+.btn-outline { 
+  background: transparent; 
+  border: 1px solid #ccc; 
+  color: var(--text); 
+}
 
-/* --- NOUVEAU CSS POUR LE MODE DICTÉE --- */
 .dictation-selector-bar {
   background: white;
   padding: 15px 20px;
@@ -434,58 +461,286 @@ const deleteTypology = async (typo: any) => {
   align-items: center;
   box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
-.selector-group label { margin-right: 15px; font-weight: bold; color: var(--primary); }
-.selector-group select { padding: 8px 12px; border-radius: 6px; border: 2px solid #ecf0f1; font-size: 1rem; outline: none; min-width: 300px; }
-.selector-group select:focus { border-color: var(--accent); }
+.selector-group label { 
+  margin-right: 15px; 
+  font-weight: bold; 
+  color: var(--primary); 
+}
+.selector-group select { 
+  padding: 8px 12px; 
+  border-radius: 6px; 
+  border: 2px solid #ecf0f1; 
+  font-size: 1rem; 
+  outline: none; 
+  min-width: 300px; 
+}
+.selector-group select:focus { 
+  border-color: var(--accent); 
+}
 
-.dictation-input-wrapper { display: flex; align-items: center; gap: 5px; font-weight: bold; color: var(--danger); }
-.penalty-input { width: 60px; padding: 4px; border: 2px solid #ccc; border-radius: 4px; text-align: center; font-weight: bold; color: var(--danger); outline: none; }
-.penalty-input:focus { border-color: var(--accent); }
+.dictation-input-wrapper { 
+  display: flex; 
+  align-items: center; 
+  gap: 5px; 
+  font-weight: bold; 
+  color: var(--danger); 
+}
+.penalty-input { 
+  width: 60px; 
+  padding: 4px; 
+  border: 2px solid #ccc; 
+  border-radius: 4px; 
+  text-align: center; 
+  font-weight: bold; 
+  color: var(--danger); 
+  outline: none; 
+}
+.penalty-input:focus { 
+  border-color: var(--accent); 
+}
 
-/* Modification du layout quand on édite une dictée */
-.workspace-layout { display: grid; grid-template-columns: 350px 1fr; gap: 20px; align-items: start; transition: 0.3s; }
-.workspace-layout.dictation-mode { grid-template-columns: 1fr; }
-.disabled-drop { cursor: not-allowed; opacity: 0.9; }
+/* Modification du layout quand on édite une dictée. */
+.workspace-layout { 
+  display: grid; 
+  grid-template-columns: 350px 1fr; 
+  gap: 20px; 
+  align-items: start; 
+  transition: 0.3s; 
+}
+.workspace-layout.dictation-mode { 
+  grid-template-columns: 1fr; 
+}
+.disabled-drop { 
+  cursor: not-allowed; 
+  opacity: 0.9; 
+}
 
-/* Styles des typologies et du drag and drop */
-.unassigned-panel { background: white; border-radius: 8px; border: 2px dashed #bdc3c7; padding: 20px; min-height: 500px; max-height: 80vh; overflow-y: auto; transition: 0.2s; }
-.unassigned-panel.drag-over { background: #f0f8ff; border-color: var(--accent); }
+/* Styles des typologies et du drag and drop. */
+.unassigned-panel { 
+  background: white; 
+  border-radius: 8px; 
+  border: 2px dashed #bdc3c7; 
+  padding: 20px; 
+  min-height: 500px; 
+  max-height: 80vh; 
+  overflow-y: auto; 
+  transition: 0.2s; 
+}
+.unassigned-panel.drag-over { 
+  background: #f0f8ff; 
+  border-color: var(--accent); 
+}
 
-.typologies-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-.typo-box { background: white; border-radius: 8px; border: 1px solid #e1e8ed; display: flex; flex-direction: column; min-height: 300px; max-height: 500px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+.typologies-grid { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+  gap: 20px; 
+}
+.typo-box { 
+  background: white; 
+  border-radius: 8px; 
+  border: 1px solid #e1e8ed; 
+  display: flex; 
+  flex-direction: column; 
+  min-height: 300px; 
+  max-height: 500px; 
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
+}
 
-.typo-header { padding: 15px; border-bottom: 1px solid #eee; font-weight: bold; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; color: var(--primary); }
-.typo-header[data-type="D"] { border-top: 4px solid var(--type-d, #e67e22); }
-.typo-header[data-type="R"] { border-top: 4px solid var(--type-r, #e74c3c); }
-.typo-header[data-type="S"] { border-top: 4px solid var(--type-s, #3498db); }
-.typo-header[data-type="AUTRE"] { border-top: 4px solid var(--type-autre, #9b59b6); }
+.typo-header { 
+  padding: 15px; 
+  border-bottom: 1px solid #eee; 
+  font-weight: bold; 
+  font-size: 0.95rem; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  color: var(--primary); 
+}
+.typo-header[data-type="D"] { 
+  border-top: 4px solid var(--type-d, #e67e22); 
+}
+.typo-header[data-type="R"] { 
+  border-top: 4px solid var(--type-r, #e74c3c); 
+}
+.typo-header[data-type="S"] { 
+  border-top: 4px solid var(--type-s, #3498db); 
+}
+.typo-header[data-type="AUTRE"] { 
+  border-top: 4px solid var(--type-autre, #9b59b6); 
+}
 
-.header-actions { display: flex; align-items: center; gap: 8px; }
-.edit-icon { cursor: pointer; opacity: 0.7; transition: 0.2s; font-size: 1.1rem; }
-.edit-icon:hover { opacity: 1; transform: scale(1.1); }
+.header-actions { 
+  display: flex; 
+  align-items: center; 
+  gap: 8px; 
+}
+.edit-icon { 
+  cursor: pointer; 
+  opacity: 0.7; 
+  transition: 0.2s; 
+  font-size: 1.1rem; 
+}
+.edit-icon:hover { 
+  opacity: 1; 
+  transform: scale(1.1); 
+}
 
-.typo-body { padding: 15px; flex: 1; overflow-y: auto; background: #fafafa; transition: 0.2s; }
-.typo-body.drag-over { background: #f0f8ff; border: 2px dashed var(--accent); }
+.typo-body { 
+  padding: 15px; 
+  flex: 1; 
+  overflow-y: auto; 
+  background: #fafafa; 
+  transition: 0.2s; 
+}
+.typo-body.drag-over { 
+  background: #f0f8ff; 
+  border: 2px dashed var(--accent); 
+}
 
-.rule-item { background: white; border: 1px solid #dcdde1; padding: 12px; margin-bottom: 10px; border-radius: 6px; cursor: grab; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-.rule-item:active { cursor: grabbing; opacity: 0.6; }
-.rule-id { font-family: monospace; color: var(--accent); font-weight: bold; font-size: 0.8rem; display: block; margin-bottom: 3px; }
-.rule-info { font-size: 0.85rem; color: var(--text); line-height: 1.3; }
+.rule-item { 
+  background: white; 
+  border: 1px solid #dcdde1; 
+  padding: 12px; 
+  margin-bottom: 10px; 
+  border-radius: 6px; 
+  cursor: grab; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+}
+.rule-item:active { 
+  cursor: grabbing; 
+  opacity: 0.6; 
+}
+.rule-id { 
+  font-family: monospace; 
+  color: var(--accent); 
+  font-weight: bold; 
+  font-size: 0.8rem; 
+  display: block; 
+  margin-bottom: 3px; 
+}
+.rule-info { 
+  font-size: 0.85rem; 
+  color: var(--text); 
+  line-height: 1.3; 
+}
 
-/* Switch css */
-.switch { position: relative; display: inline-block; width: 34px; height: 18px; flex-shrink: 0; margin-left: 10px;}
-.switch input { opacity: 0; width: 0; height: 0; }
-.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
-.slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
-input:checked + .slider { background-color: var(--accent, #1abc9c); } 
-input:checked + .slider:before { transform: translateX(16px); }
+/* Switch CSS. */
+.switch { 
+  position: relative; 
+  display: inline-block; 
+  width: 34px; 
+  height: 18px; 
+  flex-shrink: 0; 
+  margin-left: 10px;
+}
+.switch input { 
+  opacity: 0; 
+  width: 0; 
+  height: 0; 
+}
+.slider { 
+  position: absolute; 
+  cursor: pointer; 
+  top: 0; 
+  left: 0; 
+  right: 0; 
+  bottom: 0; 
+  background-color: #ccc; 
+  transition: .4s; 
+  border-radius: 20px; 
+}
+.slider:before { 
+  position: absolute; 
+  content: ""; 
+  height: 14px; 
+  width: 14px; 
+  left: 2px; 
+  bottom: 2px; 
+  background-color: white; 
+  transition: .4s; 
+  border-radius: 50%; 
+}
+input:checked + .slider { 
+  background-color: var(--accent, #1abc9c); 
+} 
+input:checked + .slider:before { 
+  transform: translateX(16px); 
+}
 
-/* Modal css */
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; justify-content: center; align-items: center; }
-.modal { background: white; padding: 30px; border-radius: 8px; width: 550px; max-width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-.form-group { margin-bottom: 15px; }
-.form-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; font-weight: 500; }
-.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
-.flex-row { display: flex; gap: 15px; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
+/* Modal CSS. */
+.modal-overlay { 
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  right: 0; 
+  bottom: 0; 
+  background: rgba(0,0,0,0.6); 
+  z-index: 1000; 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+}
+.modal { 
+  background: white; 
+  padding: 30px; 
+  border-radius: 8px; 
+  width: 550px; 
+  max-width: 90%; 
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
+}
+.form-group { 
+  margin-bottom: 15px; 
+}
+.form-group label { 
+  display: block; 
+  margin-bottom: 5px; 
+  font-size: 0.9rem; 
+  font-weight: 500; 
+}
+.form-group input, .form-group select, .form-group textarea { 
+  width: 100%; 
+  padding: 10px; 
+  border: 1px solid #ccc; 
+  border-radius: 4px; 
+  font-family: inherit; 
+}
+.flex-row { 
+  display: flex; 
+  gap: 15px; 
+}
+.modal-actions { 
+  display: flex; 
+  justify-content: flex-end; 
+  gap: 10px; 
+  margin-top: 15px; 
+}
+
+/* Barre de chargement. */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e1e8ed;
+}
+.loading-content {
+  text-align: center;
+  color: #7f8c8d;
+}
+.spinner {
+  display: inline-block;
+  font-size: 2rem;
+  margin-bottom: 10px;
+  animation: rotate 2s linear infinite;
+}
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 </style>
