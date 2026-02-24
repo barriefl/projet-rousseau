@@ -18,6 +18,7 @@ export interface Mistake {
 
 export interface Submission {
     id: number;
+    created_at: string;
     final_score: number;
     scores: Record<string, number>;
     content_student?: string;

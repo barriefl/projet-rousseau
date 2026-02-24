@@ -37,7 +37,7 @@
           :class="{ 'active': selectedSubmission?.id === sub.id }"
           @click="loadSubmissionDetails(sub)"
         >
-          Dictée {{ sub.assessment_type === 'INITIAL' ? 'Initiale' : 'Finale' }}
+          Dictée {{ sub.assessment_type === 'Initiale' ? 'Initiale' : 'Finale' }} ({{ new Date(sub.created_at).toLocaleDateString('fr-FR', { year: 'numeric' }) }})
         </button>
       </div>
       

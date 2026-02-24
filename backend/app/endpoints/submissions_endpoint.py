@@ -142,6 +142,7 @@ def get_all_submissions(student_uuid: Optional[str] = None, session: Session = D
     return [
         {
             "id": sub.id,
+            "created_at": sub.created_at.isoformat(),
             "student_uuid": sub.student.anonymous_id,
             "dictation_id": sub.dictation_id,
             "assessment_type": sub.assessment_type,

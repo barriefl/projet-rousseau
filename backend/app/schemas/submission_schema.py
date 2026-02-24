@@ -11,6 +11,7 @@ class SubmissionCreate(BaseModel):
 
 class SubmissionResponse(BaseModel):
     id: int
+    created_at: str
     student_uuid: uuid.UUID
     dictation_id: int
     assessment_type: AssessmentType
