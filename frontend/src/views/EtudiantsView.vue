@@ -185,6 +185,22 @@
         </div>
       </div>
     </div>
+
+  <div class="toast-notification" :class="notification.type" v-if="notification.show">
+    <span class="toast-icon">{{ notification.type === 'success' ? '✅' : '❌' }}</span>
+    <span class="toast-message">{{ notification.message }}</span>
+  </div>
+
+  <div class="modal-overlay" v-if="confirmDialog.show" @click.self="resolveConfirm(false)">
+    <div class="modal confirm-modal">
+      <h3 style="color: var(--danger); margin-top: 0;">⚠️ Confirmation requise</h3>
+      <p style="margin: 20px 0; line-height: 1.5; color: var(--text); white-space: pre-wrap;">{{ confirmDialog.message }}</p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" @click="resolveConfirm(false)">Annuler</button>
+        <button class="btn btn-danger" @click="resolveConfirm(true)">Confirmer</button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -247,9 +263,7 @@ onMounted(async () => {
 });
 
 const deleteStudent = async (student: Student) => {
-  const isConfirmed = confirm(
-    `⚠️ RGPD : Êtes-vous sûr de vouloir supprimer définitivement les données de ${student.first_name} ${student.last_name} ?\n\nCette action est irréversible.`
-  );
+  const isConfirmed = await askConfirm(`Êtes-vous sûr de vouloir supprimer définitivement les données de ${student.first_name} ${student.last_name} ?\n\nCette action est irréversible.`);
 
   if (isConfirmed) {
     try {
@@ -257,11 +271,11 @@ const deleteStudent = async (student: Student) => {
 
       students.value = students.value.filter(s => s.id !== student.id);
       
-      alert(`Les données de ${student.first_name} ${student.last_name} ont été supprimées avec succès.`);
+      showNotification("Données supprimées avec succès.", "success");
       
     } catch (error) {
       console.error("Erreur lors de la suppression :", error);
-      alert("Une erreur est survenue lors de la suppression de l'étudiant. Vérifiez que la route DELETE existe bien côté serveur.");
+      showNotification("Erreur lors de la suppression.", "error");
     }
   }
 };
@@ -329,12 +343,30 @@ const confirmEditStudent = async () => {
       students.value[index] = updatedStudent;
     }
 
-    alert("✅ Informations de l'étudiant mises à jour !");
+    showNotification("Informations de l'étudiant mises à jour !", "success");
     closeEditModal();
   } catch (error) {
     console.error("Erreur de mise à jour :", error);
-    alert("Impossible de modifier l'étudiant. Avez-vous créé la route backend ?");
+    showNotification("Impossible de modifier l'étudiant.", "error");
   }
+};
+
+// --- NOTIFICATIONS & CONFIRMATIONS CUSTOM. ---
+const notification = ref({ show: false, message: '', type: 'success' });
+const showNotification = (msg: string, type: 'success' | 'error' = 'success') => {
+  notification.value = { show: true, message: msg, type };
+  setTimeout(() => { notification.value.show = false; }, 4000);
+};
+
+const confirmDialog = ref({ show: false, message: '', resolve: (val: boolean) => {} });
+const askConfirm = (msg: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    confirmDialog.value = { show: true, message: msg, resolve };
+  });
+};
+const resolveConfirm = (val: boolean) => {
+  confirmDialog.value.show = false;
+  confirmDialog.value.resolve(val);
 };
 </script>
 
@@ -539,5 +571,62 @@ tr:hover {
   cursor: pointer;
   accent-color: var(--accent);
   margin: 0;
+}
+
+/* --- NOTIFICATIONS & CONFIRMATIONS. --- */
+.toast-notification {
+  position: fixed; 
+  top: 20px; 
+  right: 20px; 
+  padding: 15px 25px; 
+  border-radius: 8px;
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  font-weight: 500;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2); 
+  z-index: 9999;
+  animation: slideIn 0.3s ease-out;
+}
+.toast-notification.success { 
+  background: #d4edda; 
+  color: #155724; 
+  border-left: 5px solid #28a745; 
+}
+.toast-notification.error { 
+  background: #f8d7da; 
+  color: #721c24; 
+  border-left: 5px solid #dc3545; 
+}
+.toast-icon { 
+  font-size: 1.2rem; 
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.confirm-modal { 
+  width: 400px; 
+  text-align: center; 
+}
+.btn-danger { 
+  background: var(--danger); 
+  color: white; 
+  border: none; 
+  padding: 8px 16px; 
+  border-radius: 4px; 
+  cursor: pointer; 
+  font-weight: bold; 
+  transition: 0.2s;
+}
+.btn-danger:hover { 
+  background: #c0392b; 
+  transform: scale(1.05); 
+}
+.confirm-modal .modal-actions {
+  justify-content: center;
+  margin-top: 30px;
 }
 </style>

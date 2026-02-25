@@ -13,9 +13,9 @@
       <div v-else>
         <div class="global-settings grid-2">
           <div class="form-group">
-            <label>Associer à une dictée référente :</label>
+            <label>Associer à une dictée référente * :</label>
             <select v-model="selectedDictation">
-              <option value="">-- Aucune (Analyse libre) --</option>
+              <option value="" disabled>-- Sélectionnez une dictée --</option>
               <option v-for="dict in dictations" :key="dict.id" :value="dict.id">
                 {{ dict.title }}
               </option>
@@ -124,145 +124,161 @@
   </div>
 
   <div class="modal-overlay" v-if="showCreateModal" @click.self="closeCreateModal">
-      <div class="modal large-modal">
-        <h2 style="color: var(--primary); margin-bottom: 20px;">Créer un nouvel étudiant</h2>
+    <div class="modal large-modal">
+      <h2 style="color: var(--primary); margin-bottom: 20px;">Créer un nouvel étudiant</h2>
 
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Nom *</label>
-            <input type="text" v-model="newStudentForm.last_name" required>
-          </div>
-          <div class="form-group">
-            <label>Prénom *</label>
-            <input type="text" v-model="newStudentForm.first_name" required>
-          </div>
-          <div class="form-group">
-            <label>Promo</label>
-            <input type="text" v-model="newStudentForm.promo">
-          </div>
-          <div class="form-group">
-            <label>Groupe</label>
-            <select v-model="newStudentForm.group">
-              <option value="">-- Sélectionner --</option>
-              <option value="G0">G0</option>
-              <option value="G1">G1</option>
-              <option value="G2">G2</option>
-              <option value="G3">G3</option>
-              <option value="G4">G4</option>
-              <option value="G5">G5</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Niveau d'appétence (1-4)</label>
-            <input type="number" v-model="newStudentForm.appetence_level" min="1" max="4">
-          </div>
-          <div class="form-group">
-            <label>A une bibliothèque ?</label>
-            <select v-model="newStudentForm.has_library">
-              <option value="">-- Sélectionner --</option>
-              <option value="Oui">Oui</option>
-              <option value="Non">Non</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Support de lecture</label>
-            <select v-model="newStudentForm.reading_support">
-              <option value="">-- Sélectionner --</option>
-              <option value="Ecran">Ecran</option>
-              <option value="Papier">Papier</option>
-              <option value="Beaucoup écran - un peu papier">Beaucoup écran - un peu papier</option>
-              <option value="Beaucoup papier - un peu écran">Beaucoup papier - un peu écran</option>
-            </select>
-          </div>
-          <div class="form-group" style="grid-column: span 2;">
-            <label>Œuvres lues</label>
-            <div class="checkbox-grid">
-              <label v-for="work in readingWorksOptions" :key="work" class="checkbox-label">
-                <input type="checkbox" :value="work" v-model="selectedReadingWorks">
-                {{ work }}
-              </label>
-            </div>
-          </div>
-          <div class="form-group" style="grid-column: span 2;">
-            <label>Motif de lecture</label>
-            <div class="checkbox-grid">
-              <label v-for="motive in motiveOptions" :key="motive" class="checkbox-label">
-                <input type="checkbox" :value="motive" v-model="selectedMotives">
-                {{ motive }}
-              </label>
-            </div>
-          </div>
-          <div class="form-group" style="grid-column: span 2;">
-            <label>Niveau déclaré</label>
-            <div class="radio-grid">
-              <label v-for="level in declaredLevelOptions" :key="level" class="radio-label">
-                <input type="radio" :value="level" v-model="newStudentForm.declared_level">
-                {{ level }}
-              </label>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Diplôme Parent 1</label>
-            <select v-model="newStudentForm.parent_1_degree">
-              <option value="">-- Sélectionner --</option>
-              <option value="Aucun">Aucun</option>
-              <option value="CAP BEP BP">CAP BEP BP</option>
-              <option value="Bac">Bac</option>
-              <option value="Bac+2 BTS Licence">Bac+2 BTS Licence</option>
-              <option value="Bac+4 Master Doctorat">Bac+4 Master Doctorat</option>
-              <option value="Autres">Autres</option>
-              <option value="Je ne sais pas">Je ne sais pas</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>CSP Parent 1</label>
-            <select v-model="newStudentForm.parent_1_csp">
-              <option value="">-- Sélectionner --</option>
-              <option value="Agriculteurs exploitants">Agriculteurs exploitants</option>
-              <option value="Artisans, commerçants, chefs entreprise">Artisans, commerçants, chefs entreprise</option>
-              <option value="Cadres, professions intellectuelles sup.">Cadres, professions intellectuelles sup.</option>
-              <option value="Employés / ouvriers">Employés / ouvriers</option>
-              <option value="Retraités">Retraités</option>
-              <option value="Autres sans activité professionnelle">Autres sans activité professionnelle</option>
-              <option value="Je ne sais pas">Je ne sais pas</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Diplôme Parent 2</label>
-            <select v-model="newStudentForm.parent_2_degree">
-              <option value="">-- Sélectionner --</option>
-              <option value="Aucun">Aucun</option>
-              <option value="CAP BEP BP">CAP BEP BP</option>
-              <option value="Bac">Bac</option>
-              <option value="Bac+2 BTS Licence">Bac+2 BTS Licence</option>
-              <option value="Bac+4 Master Doctorat">Bac+4 Master Doctorat</option>
-              <option value="Autres">Autres</option>
-              <option value="Je ne sais pas">Je ne sais pas</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>CSP Parent 2</label>
-            <select v-model="newStudentForm.parent_2_csp">
-              <option value="">-- Sélectionner --</option>
-              <option value="Agriculteurs exploitants">Agriculteurs exploitants</option>
-              <option value="Artisans, commerçants, chefs entreprise">Artisans, commerçants, chefs entreprise</option>
-              <option value="Cadres, professions intellectuelles sup.">Cadres, professions intellectuelles sup.</option>
-              <option value="Employés / ouvriers">Employés / ouvriers</option>
-              <option value="Retraités">Retraités</option>
-              <option value="Autres sans activité professionnelle">Autres sans activité professionnelle</option>
-              <option value="Je ne sais pas">Je ne sais pas</option>
-            </select>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Nom *</label>
+          <input type="text" v-model="newStudentForm.last_name" required>
+        </div>
+        <div class="form-group">
+          <label>Prénom *</label>
+          <input type="text" v-model="newStudentForm.first_name" required>
+        </div>
+        <div class="form-group">
+          <label>Promo</label>
+          <input type="text" v-model="newStudentForm.promo">
+        </div>
+        <div class="form-group">
+          <label>Groupe</label>
+          <select v-model="newStudentForm.group">
+            <option value="">-- Sélectionner --</option>
+            <option value="G0">G0</option>
+            <option value="G1">G1</option>
+            <option value="G2">G2</option>
+            <option value="G3">G3</option>
+            <option value="G4">G4</option>
+            <option value="G5">G5</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Niveau d'appétence (1-4)</label>
+          <input type="number" v-model="newStudentForm.appetence_level" min="1" max="4">
+        </div>
+        <div class="form-group">
+          <label>A une bibliothèque ?</label>
+          <select v-model="newStudentForm.has_library">
+            <option value="">-- Sélectionner --</option>
+            <option value="Oui">Oui</option>
+            <option value="Non">Non</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Support de lecture</label>
+          <select v-model="newStudentForm.reading_support">
+            <option value="">-- Sélectionner --</option>
+            <option value="Ecran">Ecran</option>
+            <option value="Papier">Papier</option>
+            <option value="Beaucoup écran - un peu papier">Beaucoup écran - un peu papier</option>
+            <option value="Beaucoup papier - un peu écran">Beaucoup papier - un peu écran</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column: span 2;">
+          <label>Œuvres lues</label>
+          <div class="checkbox-grid">
+            <label v-for="work in readingWorksOptions" :key="work" class="checkbox-label">
+              <input type="checkbox" :value="work" v-model="selectedReadingWorks">
+              {{ work }}
+            </label>
           </div>
         </div>
-
-        <div class="modal-actions" style="margin-top: 25px;">
-          <button class="btn btn-outline" @click="closeCreateModal">Annuler</button>
-          <button class="btn btn-primary" @click="confirmCreateStudent" :disabled="!newStudentForm.first_name || !newStudentForm.last_name">
-            Enregistrer et associer
-          </button>
+        <div class="form-group" style="grid-column: span 2;">
+          <label>Motif de lecture</label>
+          <div class="checkbox-grid">
+            <label v-for="motive in motiveOptions" :key="motive" class="checkbox-label">
+              <input type="checkbox" :value="motive" v-model="selectedMotives">
+              {{ motive }}
+            </label>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column: span 2;">
+          <label>Niveau déclaré</label>
+          <div class="radio-grid">
+            <label v-for="level in declaredLevelOptions" :key="level" class="radio-label">
+              <input type="radio" :value="level" v-model="newStudentForm.declared_level">
+              {{ level }}
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Diplôme Parent 1</label>
+          <select v-model="newStudentForm.parent_1_degree">
+            <option value="">-- Sélectionner --</option>
+            <option value="Aucun">Aucun</option>
+            <option value="CAP BEP BP">CAP BEP BP</option>
+            <option value="Bac">Bac</option>
+            <option value="Bac+2 BTS Licence">Bac+2 BTS Licence</option>
+            <option value="Bac+4 Master Doctorat">Bac+4 Master Doctorat</option>
+            <option value="Autres">Autres</option>
+            <option value="Je ne sais pas">Je ne sais pas</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>CSP Parent 1</label>
+          <select v-model="newStudentForm.parent_1_csp">
+            <option value="">-- Sélectionner --</option>
+            <option value="Agriculteurs exploitants">Agriculteurs exploitants</option>
+            <option value="Artisans, commerçants, chefs entreprise">Artisans, commerçants, chefs entreprise</option>
+            <option value="Cadres, professions intellectuelles sup.">Cadres, professions intellectuelles sup.</option>
+            <option value="Employés / ouvriers">Employés / ouvriers</option>
+            <option value="Retraités">Retraités</option>
+            <option value="Autres sans activité professionnelle">Autres sans activité professionnelle</option>
+            <option value="Je ne sais pas">Je ne sais pas</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Diplôme Parent 2</label>
+          <select v-model="newStudentForm.parent_2_degree">
+            <option value="">-- Sélectionner --</option>
+            <option value="Aucun">Aucun</option>
+            <option value="CAP BEP BP">CAP BEP BP</option>
+            <option value="Bac">Bac</option>
+            <option value="Bac+2 BTS Licence">Bac+2 BTS Licence</option>
+            <option value="Bac+4 Master Doctorat">Bac+4 Master Doctorat</option>
+            <option value="Autres">Autres</option>
+            <option value="Je ne sais pas">Je ne sais pas</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>CSP Parent 2</label>
+          <select v-model="newStudentForm.parent_2_csp">
+            <option value="">-- Sélectionner --</option>
+            <option value="Agriculteurs exploitants">Agriculteurs exploitants</option>
+            <option value="Artisans, commerçants, chefs entreprise">Artisans, commerçants, chefs entreprise</option>
+            <option value="Cadres, professions intellectuelles sup.">Cadres, professions intellectuelles sup.</option>
+            <option value="Employés / ouvriers">Employés / ouvriers</option>
+            <option value="Retraités">Retraités</option>
+            <option value="Autres sans activité professionnelle">Autres sans activité professionnelle</option>
+            <option value="Je ne sais pas">Je ne sais pas</option>
+          </select>
         </div>
       </div>
+
+      <div class="modal-actions" style="margin-top: 25px;">
+        <button class="btn btn-outline" @click="closeCreateModal">Annuler</button>
+        <button class="btn btn-primary" @click="confirmCreateStudent" :disabled="!newStudentForm.first_name || !newStudentForm.last_name">
+          Enregistrer et associer
+        </button>
+      </div>
     </div>
+  </div>
+
+  <div class="toast-notification" :class="notification.type" v-if="notification.show">
+    <span class="toast-icon">{{ notification.type === 'success' ? '✅' : '❌' }}</span>
+    <span class="toast-message">{{ notification.message }}</span>
+  </div>
+
+  <div class="modal-overlay" v-if="confirmDialog.show" @click.self="resolveConfirm(false)">
+    <div class="modal confirm-modal">
+      <h3 style="color: var(--danger); margin-top: 0;">⚠️ Confirmation requise</h3>
+      <p style="margin: 20px 0; line-height: 1.5; color: var(--text); white-space: pre-wrap;">{{ confirmDialog.message }}</p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" @click="resolveConfirm(false)">Annuler</button>
+        <button class="btn btn-danger" @click="resolveConfirm(true)">Confirmer</button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -523,7 +539,7 @@ const confirmCreateStudent = async () => {
     closeCreateModal();
   } catch (error) {
     console.error("Erreur de création :", error);
-    alert("Impossible de créer l'étudiant. Vérifiez votre backend.");
+    showNotification("Impossible de créer l'étudiant.", "error");
   }
 };
 
@@ -546,6 +562,15 @@ const filesReadyToSubmit = computed(() => {
 
 // --- VALIDATION FINALE EN LOTS (CHUNKS). ---
 const submitAll = async () => {
+  if (!selectedDictation.value) {
+    if (typeof showNotification === 'function') {
+      showNotification("⚠️ Veuillez sélectionner une dictée référente avant de lancer l'importation.", "error");
+    } else {
+      alert("⚠️ Veuillez sélectionner une dictée référente avant de lancer l'importation.");
+    }
+    return;
+  }
+
   const filesToProcess = parsedFiles.value.filter(f => f.status === 'MATCHED' || f.status === 'CONFIRMED');
   if (filesToProcess.length === 0) return;
 
@@ -562,7 +587,7 @@ const submitAll = async () => {
 
       const payload = chunk.map(f => ({
         student_uuid: f.studentId as string,
-        dictation_id: selectedDictation.value ? Number(selectedDictation.value) : null as unknown as number,
+        dictation_id: Number(selectedDictation.value),
         assessment_type: submissionType.value,
         content_student: f.content
       }));
@@ -574,15 +599,35 @@ const submitAll = async () => {
     }
 
     setTimeout(() => {
-      alert(`Succès ! ${totalToProcess.value} dictée(s) importée(s) et analysée(s) !`);
-      router.push('/correction');
+      showNotification("Succès ! Les dictées ont été importées.", "success");
+      setTimeout(() => {
+        router.push('/correction');
+      }, 1500);
     }, 500);
     
   } catch (error) {
     console.error("Erreur d'import :", error);
-    alert("Une erreur est survenue lors de l'envoi en masse.");
+    showNotification("Une erreur est survenue lors de l'envoi en masse.", "error");
     isSubmitting.value = false;
   }
+};
+
+// --- NOTIFICATIONS & CONFIRMATIONS CUSTOM. ---
+const notification = ref({ show: false, message: '', type: 'success' });
+const showNotification = (msg: string, type: 'success' | 'error' = 'success') => {
+  notification.value = { show: true, message: msg, type };
+  setTimeout(() => { notification.value.show = false; }, 4000);
+};
+
+const confirmDialog = ref({ show: false, message: '', resolve: (val: boolean) => {} });
+const askConfirm = (msg: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    confirmDialog.value = { show: true, message: msg, resolve };
+  });
+};
+const resolveConfirm = (val: boolean) => {
+  confirmDialog.value.show = false;
+  confirmDialog.value.resolve(val);
 };
 </script>
 
@@ -899,6 +944,63 @@ const submitAll = async () => {
   margin-top: 2px;
   cursor: pointer;
   accent-color: var(--accent);
+}
+
+/* --- NOTIFICATIONS & CONFIRMATIONS. --- */
+.toast-notification {
+  position: fixed; 
+  top: 20px; 
+  right: 20px; 
+  padding: 15px 25px; 
+  border-radius: 8px;
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  font-weight: 500;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2); 
+  z-index: 9999;
+  animation: slideIn 0.3s ease-out;
+}
+.toast-notification.success { 
+  background: #d4edda; 
+  color: #155724; 
+  border-left: 5px solid #28a745; 
+}
+.toast-notification.error { 
+  background: #f8d7da; 
+  color: #721c24; 
+  border-left: 5px solid #dc3545; 
+}
+.toast-icon { 
+  font-size: 1.2rem; 
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.confirm-modal { 
+  width: 400px; 
+  text-align: center; 
+}
+.btn-danger { 
+  background: var(--danger); 
+  color: white; 
+  border: none; 
+  padding: 8px 16px; 
+  border-radius: 4px; 
+  cursor: pointer; 
+  font-weight: bold; 
+  transition: 0.2s;
+}
+.btn-danger:hover { 
+  background: #c0392b; 
+  transform: scale(1.05); 
+}
+.confirm-modal .modal-actions {
+  justify-content: center;
+  margin-top: 30px;
 }
 
 /* Barre de progression. */
