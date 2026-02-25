@@ -69,7 +69,9 @@ class StatsService:
             "Support de lecture": {},
             "CSP Parents": {},
             "Diplôme Parents": {},
-            "Niveau déclaré": {}
+            "Niveau déclaré": {},
+            "Œuvres lues": {},
+            "Motifs de lecture": {}
         }
         
         for s in students:
@@ -113,6 +115,30 @@ class StatsService:
                 # 6. Niveau déclaré.
                 niv = s.declared_level if getattr(s, 'declared_level', None) else "Non renseigné"
                 categories["Niveau déclaré"].setdefault(f"Niveau {niv}" if niv != "Non renseigné" else niv, []).append(prog)
+
+                # 7. Œuvres lues.
+                rw_val = getattr(s, 'reading_works', None)
+                if rw_val:
+                    works = [w.strip() for w in rw_val.split(';') if w.strip()]
+                    if works:
+                        for w in works:
+                            categories["Œuvres lues"].setdefault(w, []).append(prog)
+                    else:
+                        categories["Œuvres lues"].setdefault("Non renseigné", []).append(prog)
+                else:
+                    categories["Œuvres lues"].setdefault("Non renseigné", []).append(prog)
+
+                # 8. Motif de lecture.
+                mot_val = getattr(s, 'motive', None)
+                if mot_val:
+                    motives = [m.strip() for m in mot_val.split(';') if m.strip()]
+                    if motives:
+                        for m in motives:
+                            categories["Motifs de lecture"].setdefault(m, []).append(prog)
+                    else:
+                        categories["Motifs de lecture"].setdefault("Non renseigné", []).append(prog)
+                else:
+                    categories["Motifs de lecture"].setdefault("Non renseigné", []).append(prog)
 
         sociocultural_impact = {}
         for cat_name, val_dict in categories.items():

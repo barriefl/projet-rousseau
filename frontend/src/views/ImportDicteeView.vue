@@ -174,17 +174,32 @@
               <option value="Beaucoup papier - un peu écran">Beaucoup papier - un peu écran</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="grid-column: span 2;">
             <label>Œuvres lues</label>
-            <input type="text" v-model="newStudentForm.reading_works">
+            <div class="checkbox-grid">
+              <label v-for="work in readingWorksOptions" :key="work" class="checkbox-label">
+                <input type="checkbox" :value="work" v-model="selectedReadingWorks">
+                {{ work }}
+              </label>
+            </div>
           </div>
-          <div class="form-group">
-            <label>Motif</label>
-            <input type="text" v-model="newStudentForm.motive">
+          <div class="form-group" style="grid-column: span 2;">
+            <label>Motif de lecture</label>
+            <div class="checkbox-grid">
+              <label v-for="motive in motiveOptions" :key="motive" class="checkbox-label">
+                <input type="checkbox" :value="motive" v-model="selectedMotives">
+                {{ motive }}
+              </label>
+            </div>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="grid-column: span 2;">
             <label>Niveau déclaré</label>
-            <input type="text" v-model="newStudentForm.declared_level">
+            <div class="radio-grid">
+              <label v-for="level in declaredLevelOptions" :key="level" class="radio-label">
+                <input type="radio" :value="level" v-model="newStudentForm.declared_level">
+                {{ level }}
+              </label>
+            </div>
           </div>
           <div class="form-group">
             <label>Diplôme Parent 1</label>
@@ -301,6 +316,24 @@ const newStudentForm = ref({
   has_library: '', reading_support: '', reading_works: '', motive: '',
   parent_1_degree: '', parent_1_csp: '', parent_2_degree: '', parent_2_csp: '', declared_level: ''
 });
+
+const readingWorksOptions = [
+  "Romans / écrits littéraires", "Mangas / BD", "Livres de jeux, devinettes et énigmes",
+  "Textes religieux et spirituels", "Presse / revues / articles", "Poésies, poèmes",
+  "Réseaux sociaux", "Cours / livres éducatifs",
+  "Ecrits publicitaires et marketing / modes d'emploi", "Autres livres"
+];
+
+const motiveOptions = [
+  "Apprentissage", "Distraction", "Information"
+];
+
+const declaredLevelOptions = [
+  "Mauvais", "2", "3", "4", "5", "Excellent"
+];
+
+const selectedReadingWorks = ref<string[]>([]);
+const selectedMotives = ref<string[]>([]);
 
 // --- CHARGEMENT. ---
 onMounted(async () => {
@@ -448,6 +481,9 @@ const openCreateStudentForm = (fileItem: ParsedFile) => {
     reading_support: '', reading_works: '', motive: '',
     parent_1_degree: '', parent_1_csp: '', parent_2_degree: '', parent_2_csp: '', declared_level: ''
   };
+
+  selectedReadingWorks.value = [];
+  selectedMotives.value = [];
   
   showCreateModal.value = true;
 };
@@ -459,6 +495,14 @@ const closeCreateModal = () => {
 
 const confirmCreateStudent = async () => {
   if (!editingFileItem.value || !newStudentForm.value.first_name || !newStudentForm.value.last_name) return;
+
+  newStudentForm.value.reading_works = selectedReadingWorks.value.length > 0 
+    ? selectedReadingWorks.value.join(';') 
+    : '';
+
+  newStudentForm.value.motive = selectedMotives.value.length > 0 
+    ? selectedMotives.value.join(';') 
+    : '';
 
   try {
     const dataToSend = Object.fromEntries(
@@ -791,13 +835,23 @@ const submitAll = async () => {
   grid-template-columns: 1fr 1fr;
   gap: 15px;
 }
-.form-group input, .form-group select { 
+.form-group input[type="text"], 
+.form-group input[type="number"], 
+.form-group select { 
   width: 100%; 
   padding: 8px 12px; 
   border: 1px solid #ccc; 
   border-radius: 4px; 
   font-family: inherit; 
   box-sizing: border-box;
+  transition: 0.2s border-color;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus,
+.form-group select:focus {
+  border-color: var(--accent);
+  outline: none;
 }
 .form-group select {
   cursor: pointer;
@@ -807,6 +861,44 @@ const submitAll = async () => {
   display: flex; 
   justify-content: flex-end; 
   gap: 10px; 
+}
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid #e1e8ed;
+}
+.radio-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 10px;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid #e1e8ed;
+}
+.checkbox-label, .radio-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
+  line-height: 1.3;
+}
+.checkbox-label input[type="checkbox"],
+.radio-label input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  cursor: pointer;
+  accent-color: var(--accent);
 }
 
 /* Barre de progression. */
