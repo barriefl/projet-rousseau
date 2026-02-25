@@ -64,7 +64,7 @@
           class="reverso-tooltip"
           :style="{ top: tooltip.y + 'px', left: tooltip.x + 'px' }"
         >
-          <h5>Type {{ tooltip.type }} <span style="color:#e74c3c">+{{ tooltip.malus }} pt</span></h5>
+          <h5>Type '{{ tooltip.type }}' <span style="color:#e74c3c">+{{ tooltip.malus }} pt</span></h5>
           <div v-if="tooltip.ruleId" style="font-size: 0.75rem; color: #95a5a6; margin-bottom: 4px; font-family: monospace;">
             Règle : {{ tooltip.ruleId }}
           </div>
@@ -349,19 +349,19 @@ const handleMouseOut = (event: MouseEvent) => {
 :deep(.faute:hover) { 
   background-color: rgba(0,0,0,0.08); 
 }
-:deep(.faute[data-type="D"]) { /* Grammaire */
+:deep(.faute[data-type="Dessin"]) {
   border-color: #e67e22; 
   color: #e67e22; 
 }
-:deep(.faute[data-type="R"]) { /* Orthographe */
+:deep(.faute[data-type="Règle"]) {
   border-color: #e74c3c; 
   color: #e74c3c; 
 } 
-:deep(.faute[data-type="S"]) { /* Syntaxe */
+:deep(.faute[data-type="Sens"]) {
   border-color: #3498db; 
   color: #3498db; 
 } 
-:deep(.faute[data-type="AUTRE"]) { 
+:deep(.faute[data-type="Autre"]) { 
   border-color: #9b59b6; 
   color: #9b59b6; 
 }
@@ -451,16 +451,16 @@ const handleMouseOut = (event: MouseEvent) => {
   border-radius: 4px; 
   border: 1px solid #eee; 
 }
-.error-item[data-type="D"] { 
+.error-item[data-type="Dessin"] { 
   border-left-color: #e67e22; 
 }
-.error-item[data-type="R"] { 
+.error-item[data-type="Règle"] { 
   border-left-color: #e74c3c; 
 }
-.error-item[data-type="S"] { 
+.error-item[data-type="Sens"] { 
   border-left-color: #3498db; 
 }
-.error-item[data-type="AUTRE"] { 
+.error-item[data-type="Autre"] { 
   border-left-color: #9b59b6; 
 }
 

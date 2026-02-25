@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.database import init_db
 from fastapi.middleware.cors import CORSMiddleware
-from app.endpoints import stats_endpoint, submissions_endpoint, students_endpoint, dictations_endpoint, grading_scales_endpoint, rules_endpoint
+from app.endpoints import stats_endpoint, submissions_endpoint, students_endpoint, dictations_endpoint, categories_endpoint, rules_endpoint
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -43,5 +43,5 @@ app.include_router(stats_endpoint.router, prefix="/api/stats", tags=["Stats"])
 app.include_router(submissions_endpoint.router, prefix="/api/submissions", tags=["Submissions"])
 app.include_router(students_endpoint.router, prefix="/api/students", tags=["Students"])
 app.include_router(dictations_endpoint.router, prefix="/api/dictations", tags=["Dictations"])
-app.include_router(grading_scales_endpoint.router, prefix="/api/grading-scales", tags=["Grading Scales"])
+app.include_router(categories_endpoint.router, prefix="/api")
 app.include_router(rules_endpoint.router, prefix="/api/rules", tags=["Rules"])

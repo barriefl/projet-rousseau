@@ -21,7 +21,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from app.database import engine, init_db
 from app.models import (
-    AssessmentResult, AssessmentType, GradingScale, Group, MistakeType, Platform, Rule, Student, Dictation, Submission, Mistake, 
+    AssessmentResult, AssessmentType, Category, Group, MistakeType, Platform, Rule, Student, Dictation, Submission, Mistake, 
     CSP, Degree, ReadingSupport, Library
 )
 from app.utils.crypto import encrypt_text
@@ -639,139 +639,43 @@ class AssessmentImporter:
             except Exception as e:
                 self.stats.errors.append(f"Erreur Ecri+ {path.name}: {e}")
 
-def seed_grading_scales(session: Session, stats: ImportStats, dry_run: bool):
-    """Initialise les barèmes de correction Rousseau et les règles LT associées."""
+def seed_categories(session: Session, stats: ImportStats, dry_run: bool):
+    """Initialise les grandes catégories connues."""
     if dry_run:
         return
 
-    scales_data = [
-        {
-            "name": "Fautes de frappe ou erreur sur les lettres muettes", 
-            "description": "Substitutions, omissions, ajouts de lettres ou de mots.",
-            "type_rousseau": MistakeType.D,
-            "penalty": 0.5,
-            "patterns": []
-        },
-        {
-            "name": "Erreurs d'accents et de cédilles", 
-            "description": "Absence ou mauvaises utilisation des accents (ex : é/è/ê), absence ou mauvaise utilisation de la cédille (ex : ç).",
-            "type_rousseau": MistakeType.D,
-            "penalty": 1.0,
-            "patterns": []
-        },
-        {
-            "name": "Erreurs de doublement", 
-            "description": "Doubles consonnes ou voyelles manquantes ou superflues.",
-            "type_rousseau": MistakeType.D,
-            "penalty": 0.5,
-            "patterns": []
-        },
-        {
-            "name": "Confusions homophoniques", 
-            "description": "Confondre des mots qui se prononcent de la même manière mais s'écrivent différemment (ex : a/à, et/est, ses/ces/s'est/c'est, mais/mes).",
-            "type_rousseau": MistakeType.S,
-            "penalty": 1.0,
-            "patterns": []
-        },
-        {
-            "name": "Erreurs de terminaison", 
-            "description": "Mauvaise conjugaison des verbes, mauvaise formation  des adjectifs et des participes passés.",
-            "type_rousseau": MistakeType.R,
-            "penalty": 1.0,
-            "patterns": []
-        },
-        {
-            "name": "Autre erreur",
-            "description": "Erreur non classifiée.",
-            "type_rousseau": MistakeType.AUTRE,
-            "penalty": 0.0,
-            "patterns": []
-        }
+    categories_data = [
+        {"lt_id": "TYPOS", "name": "Faute de frappe", "type_rousseau": MistakeType.D, "penalty": 0.5},
+        {"lt_id": "GRAMMAR", "name": "Grammaire", "type_rousseau": MistakeType.R, "penalty": 1.0},
+        {"lt_id": "PUNCTUATION", "name": "Ponctuation", "type_rousseau": MistakeType.D, "penalty": 0.25},
+        {"lt_id": "CASING", "name": "Casse (Majuscules)", "type_rousseau": MistakeType.D, "penalty": 0.25},
+        {"lt_id": "CONFUSED_WORDS", "name": "Mots confondus (Homophones)", "type_rousseau": MistakeType.S, "penalty": 1.0},
+        {"lt_id": "FIDELITY", "name": "Fidélité au texte", "type_rousseau": MistakeType.AUTRE, "penalty": 1.0},
     ]
 
-    count_scales = 0
-    count_rules = 0
+    count_cats = 0
 
-    for data in scales_data:
-        existing_scale = session.exec(select(GradingScale).where(GradingScale.name == data["name"])).first()
+    for data in categories_data:
+        existing_cat = session.exec(select(Category).where(Category.lt_category_id == data["lt_id"])).first()
 
-        if not existing_scale:
-            scale = GradingScale(
+        if not existing_cat:
+            cat = Category(
+                lt_category_id=data["lt_id"],
                 name=data["name"],
-                description=data["description"],
                 type_rousseau=data["type_rousseau"],
                 penalty=data["penalty"]
             )
-            session.add(scale)
-            session.commit()
-            session.refresh(scale)
-            count_scales += 1
+            session.add(cat)
+            count_cats += 1
         else:
-            scale = existing_scale
-            scale.description = data["description"]
-            scale.type_rousseau = data["type_rousseau"]
-            scale.penalty = data["penalty"]
-            session.add(scale)
-            session.commit()
-
-        for pattern in data["patterns"]:
-            existing_rule = session.exec(select(Rule).where(Rule.lt_rule_id == pattern)).first()
-            if not existing_rule:
-                new_rule = Rule(
-                    lt_rule_id=pattern,
-                    description=f"Règle de base pour {scale.name}",
-                    is_active=True,
-                    grading_scale_id=scale.id
-                )
-                session.add(new_rule)
-                count_rules += 1
-            else:
-                existing_rule.grading_scale_id = scale.id
-                session.add(existing_rule)
+            existing_cat.name = data["name"]
+            existing_cat.type_rousseau = data["type_rousseau"]
+            existing_cat.penalty = data["penalty"]
+            session.add(existing_cat)
 
     if not dry_run:
         session.commit()
-        logger.info(f"📏 Barèmes : {count_scales} typologies et {count_rules} règles LT créées/mises à jour.")
-
-def seed_fidelity_rules(session: Session, stats: ImportStats, dry_run: bool):
-    if dry_run:
-        return
-    
-    scale_frappe = session.exec(select(GradingScale).where(GradingScale.name == "Fautes de frappe ou erreur sur les lettres muettes")).first()
-    scale_oubli = session.exec(select(GradingScale).where(GradingScale.name == "Oubli de mots")).first()
-
-    count_rules = 0
-
-    fidelity_rules = [
-        Rule(
-            lt_rule_id="FIDELITY_SUBSTITUTION", 
-            description="Mot remplacé ou mal orthographié (Fidélité)", 
-            is_active=True, 
-            grading_scale_id=scale_frappe.id if scale_frappe else None
-        ),
-        Rule(
-            lt_rule_id="FIDELITY_ADDITION", 
-            description="Mot ajouté en trop (Fidélité)", 
-            is_active=True, 
-            grading_scale_id=scale_frappe.id if scale_frappe else None
-        ),
-        Rule(
-            lt_rule_id="FIDELITY_OMISSION", 
-            description="Mot manquant / oublié (Fidélité)", 
-            is_active=True, 
-            grading_scale_id=scale_oubli.id if scale_oubli else None
-        ),
-    ]
-
-    for r in fidelity_rules:
-        existing = session.exec(select(Rule).where(Rule.lt_rule_id == r.lt_rule_id)).first()
-        if not existing:
-            session.add(r)
-            count_rules += 1
-            
-    if not dry_run:
-        session.commit()
-        logger.info(f"📏 Règles : {count_rules} règles de base créées.")
+        logger.info(f"📏 Catégories : {count_cats} catégories pré-configurées créées/mises à jour.")
     
 def seed_dictations(session: Session, student_service: StudentService, stats: ImportStats, dry_run: bool):
     """Import des dictées (par vague)."""
@@ -816,12 +720,9 @@ def seed_dictations(session: Session, student_service: StudentService, stats: Im
             title = f"Dictées Étude Rousseau ({suffix})"
             dictation = session.exec(select(Dictation).where(Dictation.title == title)).first()
             if not dictation:
-                default_rules = {s.name: s.penalty for s in session.exec(select(GradingScale)).all()}
-
                 dictation = Dictation(
                     title=title, 
-                    content_reference=ref_txt, 
-                    rules_config=default_rules
+                    content_reference=ref_txt
                 )
                 session.add(dictation)
                 session.commit()
@@ -916,8 +817,7 @@ def main():
             importer.import_voltaire()
             importer.import_ecriplus()
 
-            seed_grading_scales(session, stats, args.dry_run)
-            seed_fidelity_rules(session, stats, args.dry_run)
+            # seed_categories(session, stats, args.dry_run)
             seed_dictations(session, student_service, stats, args.dry_run)
 
             if not args.dry_run:

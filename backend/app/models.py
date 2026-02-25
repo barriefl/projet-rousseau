@@ -49,10 +49,10 @@ class Group(str, Enum):
     G5 = "G5"
 
 class MistakeType(str, Enum):
-    D = "D"
-    S = "S"
-    R = "R"
-    AUTRE = "A"
+    D = "Dessin"
+    S = "Sens"
+    R = "Règle"
+    AUTRE = "Autre"
 
 class TimestampMixin(SQLModel):
     created_at: datetime = Field(
@@ -113,12 +113,6 @@ class Dictation(TimestampMixin, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
 
-    rules_config: Dict = Field(
-        default={}, 
-        sa_column=Column(JSON),
-        description="Configuration des règles appliquées pour cette dictée."
-    )
-
     title: str
     content_reference: str = Field(description="Texte de référence de la dictée.")
 
@@ -126,6 +120,19 @@ class Dictation(TimestampMixin, table=True):
         back_populates="dictation",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
+
+class Category(TimestampMixin, table=True):
+    __tablename__ = "categories"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    lt_category_id: str = Field(unique=True, index=True)
+    name: str 
+    
+    type_rousseau: MistakeType = Field(default=MistakeType.AUTRE)
+    penalty: float = Field(default=1.0)
+
+    rules: List["Rule"] = Relationship(back_populates="category")
 
 class Rule(TimestampMixin, table=True):
     __tablename__ = "rules"
@@ -135,20 +142,8 @@ class Rule(TimestampMixin, table=True):
     description: str = Field(description="Description ou message par défaut de la règle.")
     is_active: bool = Field(default=True, description="Si False, cette règle sera ignorée lors de la correction.")
 
-    grading_scale_id: Optional[int] = Field(default=None, foreign_key="grading_scales.id")
-    grading_scale: Optional["GradingScale"] = Relationship(back_populates="rules")
-
-class GradingScale(TimestampMixin, table=True):
-    __tablename__ = "grading_scales"
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-
-    name: str
-    description: str
-    type_rousseau: MistakeType
-    penalty: float = Field(default=1.0)
-
-    rules: List["Rule"] = Relationship(back_populates="grading_scale")
+    category_id: Optional[int] = Field(default=None, foreign_key="categories.id")
+    category: Optional["Category"] = Relationship(back_populates="rules")
 
 class Submission(TimestampMixin, table=True):
     __tablename__ = "submissions"
@@ -178,7 +173,7 @@ class Mistake(TimestampMixin, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     submission_id: int = Field(foreign_key="submissions.id")
-    grading_scale_id: Optional[int] = Field(foreign_key="grading_scales.id")
+    category_id: Optional[int] = Field(default=None, foreign_key="categories.id")
 
     student_word: str
     correct_word: str

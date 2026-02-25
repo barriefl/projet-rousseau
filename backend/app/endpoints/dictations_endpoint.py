@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from app.database import get_session
 from app.models import Dictation
-from app.schemas.dictation_schema import DictationCreate, DictationResponse, DictationUpdateRules
+from app.schemas.dictation_schema import DictationCreate, DictationResponse
 from app.services.correction_service import CorrectionService
 
 router = APIRouter()
@@ -51,19 +51,13 @@ def get_dictation_by_id(dictation_id: int, session: Session = Depends(get_sessio
         
     return dictation
 
-@router.patch("/{dictation_id}/rules", response_model=dict, status_code=status.HTTP_200_OK)
-def update_dictation_rules(dictation_id: int, rules_in: DictationUpdateRules, session: Session = Depends(get_session)):
-    """Met à jour le barème d'une dictée et recalcule instantanément les notes des élèves."""
-    dictation = session.get(Dictation, dictation_id)
-    if not dictation:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dictée introuvable.")
-
-    dictation.rules_config = rules_in.rules_config
-    session.add(dictation)
-    session.commit()
-    session.refresh(dictation)
-
+@router.post("/recalculate", status_code=status.HTTP_200_OK)
+def recalculate_all_dictations(session: Session = Depends(get_session)):
+    """Recalcule les scores de TOUTES les dictées en fonction des catégories actuelles."""
     correction_service = CorrectionService(session)
-    correction_service.recalculate_dictation_scores(dictation)
-
-    return {"message": "Barème mis à jour et notes recalculées avec succès !"}
+    dictations = session.exec(select(Dictation)).all()
+    
+    for dictation in dictations:
+        correction_service.recalculate_dictation_scores(dictation)
+        
+    return {"detail": "Toutes les copies ont été recalculées."}

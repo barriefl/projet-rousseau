@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from typing import List
 
 from app.database import get_session
-from app.models import Rule, GradingScale
+from app.models import Category, Rule
 from app.schemas.rule_schema import RuleCreate, RuleUpdate, RuleResponse
 
 router = APIRouter()
@@ -15,8 +15,8 @@ def get_all_rules(session: Session = Depends(get_session)):
 
 @router.get("/unclassified", response_model=List[RuleResponse])
 def get_unclassified_rules(session: Session = Depends(get_session)):
-    """Récupère uniquement les règles qui n'ont pas encore été assignées à une typologie."""
-    return session.exec(select(Rule).where(Rule.grading_scale_id == None)).all()
+    """Récupère uniquement les règles qui n'ont pas encore été assignées à une catégorie."""
+    return session.exec(select(Rule).where(Rule.category_id == None)).all()
 
 @router.post("/", response_model=RuleResponse, status_code=status.HTTP_201_CREATED)
 def create_rule(rule_in: RuleCreate, session: Session = Depends(get_session)):
@@ -33,25 +33,32 @@ def create_rule(rule_in: RuleCreate, session: Session = Depends(get_session)):
 
 @router.patch("/{rule_id}", response_model=RuleResponse)
 def update_rule(rule_id: int, rule_in: RuleUpdate, session: Session = Depends(get_session)):
-    """Met à jour une règle (ex: la classer dans une typologie ou la désactiver)."""
+    """Met à jour une règle (ex: la classer dans une catégorie ou la désactiver)."""
     rule = session.get(Rule, rule_id)
     if not rule:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Règle introuvable.")
     
-    if rule_in.grading_scale_id is not None:
-        scale = session.get(GradingScale, rule_in.grading_scale_id)
-        if not scale:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Typologie introuvable.")
-        rule.grading_scale_id = rule_in.grading_scale_id
+    update_data = rule_in.model_dump(exclude_unset=True)
 
-    if rule_in.description is not None:
-        rule.description = rule_in.description
-    if rule_in.is_active is not None:
-        rule.is_active = rule_in.is_active
+    if "category_id" in update_data:
+        cat_id = update_data["category_id"]
+        if cat_id is not None:
+            category = session.get(Category, cat_id)
+            if not category:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Catégorie introuvable.")
+        
+        rule.category_id = cat_id
+
+    if "description" in update_data:
+        rule.description = update_data["description"]
+        
+    if "is_active" in update_data:
+        rule.is_active = update_data["is_active"]
 
     session.add(rule)
     session.commit()
     session.refresh(rule)
+    
     return rule
 
 @router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)

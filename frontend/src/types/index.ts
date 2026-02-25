@@ -3,19 +3,6 @@ export enum AssessmentType {
   FINAL = "FINAL"
 }
 
-export interface Mistake {
-    id?: number
-    student_word: string;
-    correct_word: string;
-    position_index: number;
-    length: number;
-    category_code: string;
-    type_rousseau: 'D' | 'S' | 'R' | 'A';
-    malus_applied: number;
-    rule_id_lt: string;
-    message: string;
-}
-
 export interface Submission {
     id: number;
     created_at: string;
@@ -68,16 +55,6 @@ export interface Dictation {
   id: number;
   title: string;
   content_reference: string;
-  rules_config?: Record<string, number>;
-}
-
-export interface GradingScale {
-  id: number;
-  code: string;
-  name: string;
-  type_rousseau: string;
-  penalty: number;
-  lt_rule_patterns: string | null;
 }
 
 export interface StudentProgression {
@@ -88,4 +65,34 @@ export interface StudentProgression {
   score_initial: number | null;
   score_final: number | null;
   progress: number | null;
+}
+
+export interface Category {
+  id: number;
+  lt_category_id: string;
+  name: string;
+  type_rousseau: string;
+  penalty: number;
+}
+
+export interface Rule {
+  id: number;
+  lt_rule_id: string;
+  description: string;
+  is_active: boolean;
+  category_id: number | null;
+  category?: Category;
+}
+
+export interface Mistake {
+    id?: number
+    student_word: string;
+    correct_word: string;
+    position_index: number;
+    length: number;
+    category_id: number | null;
+    type_rousseau: 'D' | 'S' | 'R' | 'A';
+    malus_applied: number;
+    rule_id_lt: string;
+    message: string;
 }

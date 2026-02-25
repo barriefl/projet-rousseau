@@ -1,144 +1,59 @@
 <template>
   <div class="emile-regles">
     <div class="header">
-      <h1>Typologies & Règles</h1>
-      <button v-if="!selectedDictationId" class="btn btn-primary" @click="openModal('create')">
-        ➕ Nouvelle Typologie
+      <h1>Catégories & Règles</h1>
+      <button class="btn btn-primary" @click="recalculateGlobal" :disabled="isSavingRules">
+        {{ isSavingRules ? '⏳ Recalcul en cours...' : '🔄 Recalculer les notes de toutes les dictées' }}
       </button>
-    </div>
-
-    <div class="dictation-selector-bar">
-      <div class="selector-group">
-        <label>Mode de configuration :</label>
-        <select v-model="selectedDictationId" @change="loadDictationRules">
-          <option value="">⚙️ Configuration Globale (Défaut)</option>
-          <option v-for="dict in dictations" :key="dict.id" :value="dict.id">
-            📝 Dictée : {{ dict.title }}
-          </option>
-        </select>
-      </div>
-      
-      <div class="dictation-selector-bar">
-        <div v-if="selectedDictationId" class="save-action">
-          <button class="btn btn-success" @click="saveDictationRules" :disabled="isSavingRules">
-            {{ isSavingRules ? '⏳ Recalcul en cours...' : '💾 Sauvegarder ce barème et recalculer les notes' }}
-          </button>
-        </div>
-        
-        <div v-else class="save-action">
-          <button class="btn btn-primary" @click="recalculateGlobal" :disabled="isSavingRules">
-            {{ isSavingRules ? '⏳ Mise à jour en cours...' : '🔄 Sauvegarder les règles et recalculer les notes' }}
-          </button>
-        </div>
-      </div>
     </div>
 
     <div v-if="isLoading" class="loading-container">
       <div class="loading-content">
         <span class="spinner">⏳</span>
-        <p>Chargement des typologies et du moteur de règles...</p>
+        <p>Chargement des catégories et des règles...</p>
       </div>
     </div>
 
-    <div v-else class="workspace-layout" :class="{ 'dictation-mode': selectedDictationId }">
-      
-      <div 
-        v-if="!selectedDictationId"
-        class="unassigned-panel"
-        @dragover.prevent
-        @dragenter.prevent="handleDragEnter"
-        @dragleave.prevent="handleDragLeave"
-        @drop="onDropUnassigned"
-      >
-        <h3 style="margin-top: 0; color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 10px;">
-          📥 Nouvelles règles détectées
-        </h3>
-        <p v-if="unclassifiedRules.length === 0" style="color: #7f8c8d; font-size: 0.9rem; text-align: center; margin-top: 20px;">
-          Toutes les règles connues sont classées !
-        </p>
-        
-        <div class="rules-container">
-          <div 
-            v-for="rule in unclassifiedRules" 
-            :key="rule.id" 
-            class="rule-item" 
-            draggable="true"
-            @dragstart="onDragStart($event, rule, 'unassigned')"
-          >
-            <div>
-              <span class="rule-id">{{ rule.lt_rule_id }}</span>
-              <div class="rule-info">{{ rule.description || 'Description manquante' }}</div>
-            </div>
-            <label class="switch">
-              <input type="checkbox" v-model="rule.is_active" @change="toggleRuleActive(rule)">
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <div class="typologies-grid">
-        <div v-if="isLoading" style="color: #7f8c8d; padding: 20px;">⏳ Chargement...</div>
-
+    <div v-else class="workspace-layout">
+      <div class="categories-grid">
         <div 
-          v-else
-          v-for="typo in typologies" 
-          :key="typo.id" 
-          class="typo-box"
+          v-for="category in categories" 
+          :key="category.id" 
+          class="category-box"
         >
-          <div class="typo-header" :data-type="typo.type_rousseau">
-            <span>{{ typo.name }}</span>
+          <div class="category-header" :data-type="category.type_rousseau">
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <span>{{ category.name }}</span>
+              <span style="font-size: 0.75rem; font-family: monospace; font-weight: normal; opacity: 0.8;">
+                {{ category.lt_category_id }}
+              </span>
+            </div>
             <div class="header-actions">
-              
-              <div v-if="selectedDictationId" class="dictation-input-wrapper">
-                <span>+</span>
-                <input 
-                  type="number" 
-                  step="0.25" 
-                  min="0" 
-                  v-model.number="rulesConfigOverrides[typo.name]"
-                  class="penalty-input"
-                >
-                <span>pt</span>
-              </div>
-              
-              <template v-else>
-                <span class="badge" style="background: #eee; color: #333; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem;">
-                  +{{ typo.penalty }} pt
-                </span>
-                <span class="edit-icon" @click="openModal('edit', typo)">✏️</span>
-                <span class="edit-icon" style="color: var(--danger);" @click="deleteTypology(typo)">🗑️</span>
-              </template>
+              <span class="badge" style="background: #eee; color: #333; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem;">
+                +{{ category.penalty }} pt
+              </span>
+              <span class="edit-icon" @click="openModal(category)">✏️</span>
             </div>
           </div>
 
-          <div 
-            class="typo-body"
-            @dragover.prevent
-            @dragenter.prevent="handleDragEnter"
-            @dragleave.prevent="handleDragLeave"
-            @drop="onDropToTypology($event, typo)"
-            :class="{ 'disabled-drop': selectedDictationId }"
-          >
+          <div class="category-body">
             <div 
-              v-for="rule in typo.rules" 
+              v-for="rule in category.rules" 
               :key="rule.id" 
               class="rule-item" 
-              :draggable="!selectedDictationId"
-              @dragstart="onDragStart($event, rule, typo.id)"
             >
               <div>
                 <span class="rule-id">{{ rule.lt_rule_id }}</span>
                 <div class="rule-info">{{ rule.description }}</div>
               </div>
               <label class="switch">
-                <input type="checkbox" v-model="rule.is_active" @change="toggleRuleActive(rule)" :disabled="selectedDictationId !== ''">
+                <input type="checkbox" v-model="rule.is_active" @change="toggleRuleActive(rule)">
                 <span class="slider"></span>
               </label>
             </div>
             
-            <div v-if="!typo.rules || typo.rules.length === 0" style="text-align: center; color: #bdc3c7; font-size: 0.85rem; padding-top: 20px;">
-              {{ selectedDictationId ? 'Aucune règle dans cette typologie.' : 'Glissez des règles LanguageTool ici.' }}
+            <div v-if="!category.rules || category.rules.length === 0" style="text-align: center; color: #bdc3c7; font-size: 0.85rem; padding-top: 20px;">
+              Aucune règle détectée pour cette catégorie.
             </div>
           </div>
         </div>
@@ -147,39 +62,37 @@
 
     <div class="modal-overlay" v-if="isModalOpen" @click.self="closeModal">
       <div class="modal">
-        <h2 style="color: var(--primary); margin-bottom: 20px;">
-          {{ modalMode === 'edit' ? 'Modifier la Typologie' : 'Nouvelle Typologie' }}
-        </h2>
+        <h2 style="color: var(--primary); margin-bottom: 20px;">Modifier la Catégorie</h2>
         
         <div class="form-group">
-          <label>Titre de la typologie :</label>
-          <input type="text" v-model="currentTypo.name">
+          <label>ID Technique (LanguageTool) :</label>
+          <input type="text" :value="currentCategory.lt_category_id" disabled style="background-color: #f5f5f5; color: #888;">
         </div>
         
         <div class="form-group">
-          <label>Description :</label>
-          <textarea v-model="currentTypo.description" rows="2"></textarea>
+          <label>Nom de la catégorie :</label>
+          <input type="text" v-model="currentCategory.name" disabled style="background-color: #f5f5f5; color: #888;">
         </div>
         
         <div class="flex-row">
           <div class="form-group" style="flex: 1;">
             <label>Type Rousseau :</label>
-            <select v-model="currentTypo.type_rousseau">
-              <option value="D">D (Dessin)</option>
-              <option value="R">R (Règle)</option>
-              <option value="S">S (Sens)</option>
-              <option value="AUTRE">AUTRE</option>
+            <select v-model="currentCategory.type_rousseau">
+              <option value="Dessin">D (Dessin)</option>
+              <option value="Règle">R (Règle)</option>
+              <option value="Sens">S (Sens)</option>
+              <option value="Autre">AUTRE</option>
             </select>
           </div>
           <div class="form-group" style="flex: 1;">
             <label>Malus appliqué :</label>
-            <input type="number" v-model="currentTypo.penalty" step="0.25" min="0">
+            <input type="number" v-model="currentCategory.penalty" step="0.25" min="0">
           </div>
         </div>
         
         <div class="modal-actions">
           <button class="btn btn-outline" @click="closeModal">Annuler</button>
-          <button class="btn btn-primary" @click="saveTypology" :disabled="isSaving || !currentTypo.name">
+          <button class="btn btn-primary" @click="saveCategory" :disabled="isSaving || !currentCategory.name">
             {{ isSaving ? 'Sauvegarde...' : 'Enregistrer' }}
           </button>
         </div>
@@ -192,33 +105,18 @@
 import { ref, onMounted } from 'vue';
 import api from '@/services/api';
 
-import type { Dictation } from '@/types'; 
-
 // --- ÉTATS GLOBAUX. ---
-const typologies = ref<any[]>([]);
-const unclassifiedRules = ref<any[]>([]);
+const categories = ref<any[]>([]);
 const isLoading = ref(true);
 const isSaving = ref(false);
-
-// --- ÉTATS POUR LE MODE DICTÉE. ---
-const dictations = ref<Dictation[]>([]);
-const selectedDictationId = ref<number | ''>('');
-const rulesConfigOverrides = ref<Record<string, number>>({});
 const isSavingRules = ref(false);
 
 // --- CHARGEMENT DES DONNÉES. ---
 const loadData = async () => {
   isLoading.value = true;
   try {
-    const [typoRes, unassignedRes, dictRes] = await Promise.all([
-      api.getGradingScales(),
-      api.getUnclassifiedRules(),
-      api.getDictations()
-    ]);
-    
-    typologies.value = typoRes.data; 
-    unclassifiedRules.value = unassignedRes.data;
-    dictations.value = dictRes.data;
+    const res = await api.getCategories();
+    categories.value = res.data;
   } catch (error) {
     console.error("Erreur de chargement :", error);
   } finally {
@@ -228,131 +126,20 @@ const loadData = async () => {
 
 onMounted(() => { loadData(); });
 
-// --- LOGIQUE DU MODE DICTÉE. ---
-const loadDictationRules = () => {
-  if (!selectedDictationId.value) {
-    rulesConfigOverrides.value = {};
-    return;
-  }
-
-  const dict = dictations.value.find(d => d.id === selectedDictationId.value);
-  rulesConfigOverrides.value = {};
-
-  typologies.value.forEach(typo => {
-    const savedPenalty = dict?.rules_config?.[typo.name];
-
-    if (savedPenalty !== undefined && savedPenalty !== null) {
-      rulesConfigOverrides.value[typo.name] = savedPenalty;
-    } else {
-      rulesConfigOverrides.value[typo.name] = typo.penalty;
-    }
-  });
-};
-
-const saveDictationRules = async () => {
-  if (!selectedDictationId.value) return;
-  
-  const confirmSave = confirm("Sauvegarder et recalculer toutes les copies de cette dictée ?");
-  if (!confirmSave) return;
-
-  isSavingRules.value = true;
-
-  try {
-    await api.updateDictationRules(Number(selectedDictationId.value), rulesConfigOverrides.value);
-    
-    const dictIndex = dictations.value.findIndex(d => d.id === selectedDictationId.value);
-    const dictToUpdate = dictations.value[dictIndex];
-    if (dictToUpdate) {
-      dictToUpdate.rules_config = { ...rulesConfigOverrides.value };
-    }
-
-    alert("✅ Barème mis à jour et scores recalculés !");
-  } catch (error) {
-    console.error("Erreur lors de la sauvegarde :", error);
-    alert("Erreur lors du recalcul.");
-  } finally {
-    isSavingRules.value = false;
-  }
-};
-
 const recalculateGlobal = async () => {
-  const confirmSave = confirm("Voulez-vous appliquer ce nouveau rangement de règles et recalculer les scores de TOUTES les dictées ?");
+  const confirmSave = confirm("Voulez-vous recalculer les scores de TOUTES les dictées avec le barème actuel ?");
   if (!confirmSave) return;
 
   isSavingRules.value = true;
 
   try {
-    const updatePromises = dictations.value.map(dict => {
-      
-      const currentConfig: Record<string, number> = {};
-      
-      typologies.value.forEach(typo => {
-        const savedPenalty = dict.rules_config?.[typo.name];
-        currentConfig[typo.name] = savedPenalty !== undefined ? savedPenalty : typo.penalty;
-      });
-
-      return api.updateDictationRules(dict.id, currentConfig);
-    });
-
-    await Promise.all(updatePromises);
-    
-    alert("✅ Toutes les règles ont été mises à jour et l'ensemble des copies recalculées !");
+    await api.recalculateAllDictations(); 
+    alert("✅ Toutes les copies ont été recalculées avec succès !");
   } catch (error) {
     console.error("Erreur lors du recalcul global :", error);
     alert("Une erreur est survenue lors de la mise à jour globale.");
   } finally {
     isSavingRules.value = false;
-  }
-};
-
-// --- LOGIQUE DRAG & DROP. ---
-let draggedRule: any = null;
-let draggedSourceId: number | 'unassigned' | null = null;
-
-const onDragStart = (e: DragEvent, rule: any, sourceId: number | 'unassigned') => {
-  if (selectedDictationId.value) {
-    e.preventDefault();
-    return;
-  }
-  draggedRule = rule;
-  draggedSourceId = sourceId;
-};
-
-const handleDragEnter = (e: Event) => {
-  if (selectedDictationId.value) return;
-  (e.currentTarget as HTMLElement).classList.add('drag-over');
-};
-
-const handleDragLeave = (e: Event) => {
-  if (selectedDictationId.value) return;
-  (e.currentTarget as HTMLElement).classList.remove('drag-over');
-};
-
-const onDropToTypology = async (e: Event, targetTypo: any) => {
-  if (selectedDictationId.value) return;
-  (e.currentTarget as HTMLElement).classList.remove('drag-over');
-  
-  if (!draggedRule || draggedSourceId === targetTypo.id) return;
-  
-  try {
-    await api.updateRule(draggedRule.id, { grading_scale_id: targetTypo.id });
-    await loadData();
-  } catch (error) {
-    console.error("Erreur lors de l'assignation :", error);
-  }
-};
-
-const onDropUnassigned = async (e: Event) => {
-  if (selectedDictationId.value) return;
-  (e.currentTarget as HTMLElement).classList.remove('drag-over');
-  
-  if (!draggedRule || draggedSourceId === 'unassigned') return;
-  
-  try {
-    await api.updateRule(draggedRule.id, { grading_scale_id: null });
-    await loadData();
-  } catch (error) {
-    console.error("Erreur lors du désassignement :", error);
   }
 };
 
@@ -364,56 +151,33 @@ const toggleRuleActive = async (rule: any) => {
   }
 };
 
-// --- LOGIQUE MODAL TYPOLOGIE. ---
+// --- LOGIQUE MODAL CATÉGORIE. ---
 const isModalOpen = ref(false);
-const modalMode = ref<'create' | 'edit'>('create');
-const currentTypo = ref<any>({});
+const currentCategory = ref<any>({});
 
-const openModal = (mode: 'create' | 'edit', typo?: any) => {
-  modalMode.value = mode;
-  if (mode === 'edit' && typo) {
-    currentTypo.value = { ...typo };
-  } else {
-    currentTypo.value = { name: '', description: '', type_rousseau: 'D', penalty: 1.0 };
-  }
+const openModal = (category: any) => {
+  currentCategory.value = { ...category };
   isModalOpen.value = true;
 };
 
 const closeModal = () => { isModalOpen.value = false; };
 
-const saveTypology = async () => {
+const saveCategory = async () => {
   isSaving.value = true;
 
   const payload = {
-    ...currentTypo.value,
-    description: currentTypo.value.description === '' ? null : currentTypo.value.description
+    type_rousseau: currentCategory.value.type_rousseau,
+    penalty: currentCategory.value.penalty
   };
 
   try {
-    if (modalMode.value === 'edit') {
-      await api.updateGradingScale(currentTypo.value.id, currentTypo.value);
-    } else {
-      await api.createGradingScale(currentTypo.value);
-    }
-
+    await api.updateCategory(currentCategory.value.id, payload);
     await loadData();
     closeModal();
-    
   } catch (error) {
     console.error("Erreur sauvegarde :", error);
   } finally {
     isSaving.value = false;
-  }
-};
-
-const deleteTypology = async (typo: any) => {
-  if (confirm(`Voulez-vous supprimer "${typo.name}" ? Ses règles redeviendront non assignées.`)) {
-    try {
-      await api.deleteGradingScale(typo.id);
-      await loadData();
-    } catch (error) {
-      console.error("Erreur suppression :", error);
-    }
   }
 };
 </script>
@@ -443,108 +207,24 @@ const deleteTypology = async (typo: any) => {
   background: var(--accent); 
   color: white; 
 }
-.btn-success { 
-  background: #2ecc71; 
-  color: white; 
-  font-weight: bold; 
-}
-.btn-success:hover:not(:disabled) { 
-  background: #27ae60; 
-  transform: translateY(-2px); 
-}
 .btn-outline { 
   background: transparent; 
   border: 1px solid #ccc; 
   color: var(--text); 
 }
 
-.dictation-selector-bar {
-  background: white;
-  padding: 15px 20px;
-  border-radius: 8px;
-  border: 1px solid #e1e8ed;
-  margin-bottom: 25px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-}
-.selector-group label { 
-  margin-right: 15px; 
-  font-weight: bold; 
-  color: var(--primary); 
-}
-.selector-group select { 
-  padding: 8px 12px; 
-  border-radius: 6px; 
-  border: 2px solid #ecf0f1; 
-  font-size: 1rem; 
-  outline: none; 
-  min-width: 300px; 
-}
-.selector-group select:focus { 
-  border-color: var(--accent); 
-}
-
-.dictation-input-wrapper { 
-  display: flex; 
-  align-items: center; 
-  gap: 5px; 
-  font-weight: bold; 
-  color: var(--danger); 
-}
-.penalty-input { 
-  width: 60px; 
-  padding: 4px; 
-  border: 2px solid #ccc; 
-  border-radius: 4px; 
-  text-align: center; 
-  font-weight: bold; 
-  color: var(--danger); 
-  outline: none; 
-}
-.penalty-input:focus { 
-  border-color: var(--accent); 
-}
-
-/* Modification du layout quand on édite une dictée. */
+/* Modification du layout. */
 .workspace-layout { 
-  display: grid; 
-  grid-template-columns: 350px 1fr; 
-  gap: 20px; 
-  align-items: start; 
-  transition: 0.3s; 
-}
-.workspace-layout.dictation-mode { 
-  grid-template-columns: 1fr; 
-}
-.disabled-drop { 
-  cursor: not-allowed; 
-  opacity: 0.9; 
+  display: block; 
 }
 
-/* Styles des typologies et du drag and drop. */
-.unassigned-panel { 
-  background: white; 
-  border-radius: 8px; 
-  border: 2px dashed #bdc3c7; 
-  padding: 20px; 
-  min-height: 500px; 
-  max-height: 80vh; 
-  overflow-y: auto; 
-  transition: 0.2s; 
-}
-.unassigned-panel.drag-over { 
-  background: #f0f8ff; 
-  border-color: var(--accent); 
-}
-
-.typologies-grid { 
+/* Styles des catégories. */
+.categories-grid { 
   display: grid; 
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); 
   gap: 20px; 
 }
-.typo-box { 
+.category-box { 
   background: white; 
   border-radius: 8px; 
   border: 1px solid #e1e8ed; 
@@ -555,7 +235,7 @@ const deleteTypology = async (typo: any) => {
   box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
 }
 
-.typo-header { 
+.category-header { 
   padding: 15px; 
   border-bottom: 1px solid #eee; 
   font-weight: bold; 
@@ -565,18 +245,10 @@ const deleteTypology = async (typo: any) => {
   align-items: center; 
   color: var(--primary); 
 }
-.typo-header[data-type="D"] { 
-  border-top: 4px solid var(--type-d, #e67e22); 
-}
-.typo-header[data-type="R"] { 
-  border-top: 4px solid var(--type-r, #e74c3c); 
-}
-.typo-header[data-type="S"] { 
-  border-top: 4px solid var(--type-s, #3498db); 
-}
-.typo-header[data-type="AUTRE"] { 
-  border-top: 4px solid var(--type-autre, #9b59b6); 
-}
+.category-header[data-type="Dessin"] { border-top: 4px solid var(--type-d, #e67e22); }
+.category-header[data-type="Règle"] { border-top: 4px solid var(--type-r, #e74c3c); }
+.category-header[data-type="Sens"] { border-top: 4px solid var(--type-s, #3498db); }
+.category-header[data-type="Autre"] { border-top: 4px solid var(--type-autre, #9b59b6); }
 
 .header-actions { 
   display: flex; 
@@ -594,16 +266,11 @@ const deleteTypology = async (typo: any) => {
   transform: scale(1.1); 
 }
 
-.typo-body { 
+.category-body { 
   padding: 15px; 
   flex: 1; 
   overflow-y: auto; 
   background: #fafafa; 
-  transition: 0.2s; 
-}
-.typo-body.drag-over { 
-  background: #f0f8ff; 
-  border: 2px dashed var(--accent); 
 }
 
 .rule-item { 
@@ -612,15 +279,10 @@ const deleteTypology = async (typo: any) => {
   padding: 12px; 
   margin-bottom: 10px; 
   border-radius: 6px; 
-  cursor: grab; 
   display: flex; 
   justify-content: space-between; 
   align-items: center; 
   box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
-}
-.rule-item:active { 
-  cursor: grabbing; 
-  opacity: 0.6; 
 }
 .rule-id { 
   font-family: monospace; 

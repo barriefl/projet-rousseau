@@ -19,7 +19,7 @@
       <div class="sub-nav" :class="{ 'open': isEmileOpen }">
         <RouterLink to="/gestion" class="sub-nav-item" active-class="active">📂 Gestion des dictées</RouterLink>
         <RouterLink to="/analyse" class="sub-nav-item" active-class="active">📈 Analyse des travaux</RouterLink>
-        <RouterLink to="/regles" class="sub-nav-item" active-class="active">⚙️ Typologies & Règles</RouterLink>
+        <RouterLink to="/regles" class="sub-nav-item" active-class="active">⚙️ Catégories & Règles</RouterLink>
       </div>
 
       <RouterLink to="/etudiants" class="nav-item" active-class="active">

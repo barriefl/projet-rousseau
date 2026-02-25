@@ -46,18 +46,14 @@ export default {
         return response.data;
     },
 
-    getGradingScales() {
-        return apiClient.get('/grading-scales');
+    async getCategories() {
+        return apiClient.get('/categories');
     },
-    createGradingScale(payload: any) {
-        return apiClient.post('/grading-scales', payload);
-    },   
-    deleteGradingScale(scaleId: number) {
-        return apiClient.delete(`/grading-scales/${scaleId}`);
+    async updateCategory(categoryId: number, categoryData: any) {
+        return apiClient.patch(`/categories/${categoryId}`, categoryData);
     },
-    async updateGradingScale(scaleId: number, scaleData: any) {
-        const response = await apiClient.patch(`/grading-scales/${scaleId}`, scaleData); 
-        return response.data;
+    async recalculateAllDictations() {
+        return apiClient.post('/dictations/recalculate');
     },
 
     getUnclassifiedRules() {
