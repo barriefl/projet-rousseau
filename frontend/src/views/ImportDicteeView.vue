@@ -2,16 +2,24 @@
   <div class="import-view">
     <div class="header">
       <button class="btn btn-outline" @click="router.push('/gestion')">← Retour</button>
-      <h1>📥 Importation de Dictées</h1>
+      <h1>Importation de Dictées</h1>
     </div>
 
     <div class="form-card">
-      <div v-if="isLoading" class="loading-state">
-        ⏳ Chargement des étudiants et dictées...
-      </div>
-      
+      <AppLoading v-if="isLoading" message="Chargement des données..." />
+
       <div v-else>
-        <div class="global-settings grid-2">
+        <div class="global-settings grid-3">
+          <div class="form-group">
+            <label>Promotion cible * :</label>
+            <select v-model="selectedPromotion" @change="handlePromotionChange">
+              <option value="" disabled>-- Sélectionnez une promotion --</option>
+              <option v-for="promo in promotions" :key="promo.id" :value="promo.id">
+                {{ promo.name }}
+              </option>
+            </select>
+          </div>
+
           <div class="form-group">
             <label>Associer à une dictée référente * :</label>
             <select v-model="selectedDictation">
@@ -21,61 +29,57 @@
               </option>
             </select>
           </div>
-          
+
           <div class="form-group">
             <label>Type d'évaluation :</label>
             <select v-model="submissionType">
-              <option value="Initiale">Dictée Initiale</option>
-              <option value="Finale">Dictée Finale</option>
+              <option v-for="type in Object.values(AssessmentTypes)" :key="type" :value="type">
+                {{ type }}
+              </option>
             </select>
           </div>
         </div>
 
         <div class="form-group" style="margin-top: 25px;">
           <label>Fichiers étudiants (.txt) :</label>
-          <div 
-            class="upload-zone" 
-            @click="triggerFileInput"
-            @dragover.prevent="dragOver = true"
-            @dragleave.prevent="dragOver = false"
-            @drop.prevent="handleDrop"
-            :class="{ 'drag-over': dragOver }"
-          >
-            <i>📄</i>
-            <h3>Cliquez ou glissez-déposez vos fichiers .txt ici</h3>
-            <p>Le format conseillé du nom de fichier est "NOM_Prenom.txt"</p>
-            <input 
-              type="file" 
-              ref="fileInputRef" 
-              style="display: none;" 
-              accept=".txt"
-              multiple
-              @change="handleFileUpload"
-            >
+          <div class="upload-zone" @click="triggerFileInput" @dragover.prevent="dragOver = true"
+            @dragleave.prevent="dragOver = false" @drop.prevent="handleDrop"
+            :class="{ 'drag-over': dragOver, 'disabled': !selectedPromotion }">
+            <FileText :size="48" class="upload-icon" />
+            <h3 v-if="selectedPromotion">Cliquez ou glissez-déposez vos fichiers .txt ici</h3>
+            <h3 v-else style="color: var(--danger);">Veuillez sélectionner une promotion d'abord</h3>
+            <p>Le format conseillé du nom de fichier est "NOM_Prenom_*.txt"</p>
+            <input type="file" ref="fileInputRef" style="display: none;" accept=".txt" multiple
+              :disabled="!selectedPromotion" @change="handleFileUpload">
           </div>
         </div>
 
         <div v-if="parsedFiles.length > 0" class="files-list">
           <h3 class="list-title">Traitement des fichiers ({{ parsedFiles.length }})</h3>
-          
-          <div 
-            v-for="fileItem in parsedFiles" 
-            :key="fileItem.id" 
-            class="file-item"
-            :class="`status-${fileItem.status.toLowerCase()}`"
-          >
+
+          <div v-for="fileItem in parsedFiles" :key="fileItem.id" class="file-item"
+            :class="`status-${fileItem.status.toLowerCase()}`">
             <div class="file-info">
               <span class="file-name">{{ fileItem.originalName }}</span>
-              <span class="parsed-name" v-if="fileItem.parsedName">👉 Extrait : "{{ fileItem.parsedName }}"</span>
+              <span class="parsed-name" v-if="fileItem.parsedName">
+                <ArrowRight :size="14" />
+                <span>Extrait : "{{ fileItem.parsedName }}"</span>
+              </span>
             </div>
 
             <div v-if="fileItem.status === 'MATCHED' || fileItem.status === 'CONFIRMED'" class="file-action success">
-              ✅ Associé à <strong>{{ getStudentName(fileItem.studentId) }}</strong>
-              <button class="btn btn-sm btn-outline" style="margin-left: auto;" @click="openCreateStudentForm(fileItem)">➕ Créer un autre étudiant</button>
+              <CheckCircle :size="18" />
+              <span>Associé à <strong>{{ getStudentName(fileItem.studentId) }}</strong></span>
+              <button class="btn btn-sm btn-outline btn-with-icon" style="margin-left: auto;"
+                @click="openCreateStudentForm(fileItem)">
+                <UserPlus :size="14" /> <span>Créer un autre étudiant</span>
+              </button>
             </div>
 
             <div v-if="fileItem.status === 'SUGGESTED'" class="file-action warning">
-              ⚠️ Voulez-vous dire <strong>{{ fileItem.suggestedStudent?.last_name }} {{ fileItem.suggestedStudent?.first_name }}</strong> ?
+              <AlertTriangle :size="18" />
+              <span>Voulez-vous dire <strong>{{ fileItem.suggestedStudent?.last_name }} {{
+                fileItem.suggestedStudent?.first_name }}</strong> ?</span>
               <div class="btn-group">
                 <button class="btn btn-sm btn-success" @click="confirmSuggestion(fileItem)">Oui</button>
                 <button class="btn btn-sm btn-outline" @click="rejectSuggestion(fileItem)">Non</button>
@@ -83,31 +87,37 @@
             </div>
 
             <div v-if="fileItem.status === 'UNKNOWN'" class="file-action danger">
-              ❌ Aucun étudiant trouvé.
+              <XCircle :size="18" />
+              <span>Aucun étudiant trouvé dans cette promotion.</span>
               <div class="btn-group">
-                <button class="btn btn-sm btn-primary" @click="openCreateStudentForm(fileItem)">➕ Créer étudiant</button>
+                <button class="btn btn-sm btn-primary btn-with-icon" @click="openCreateStudentForm(fileItem)">
+                  <Plus :size="14" />
+                  <span>Créer étudiant</span>
+                </button>
                 <button class="btn btn-sm btn-outline" @click="ignoreFile(fileItem)">Ignorer fichier</button>
               </div>
             </div>
 
             <div v-if="fileItem.status === 'IGNORED'" class="file-action text-muted">
               Fichier ignoré.
-              <button class="btn btn-sm btn-outline" @click="reprocessFile(fileItem)" style="margin-left: 10px;">Annuler</button>
+              <button class="btn btn-sm btn-outline" @click="reprocessFile(fileItem)"
+                style="margin-left: 10px;">Annuler</button>
             </div>
           </div>
         </div>
-        
+
         <div class="actions" v-if="parsedFiles.length > 0">
-          <p v-if="!canSubmit && !isSubmitting" class="warning-text" style="margin-right: 15px;">
-            ⚠️ Traitez les fichiers en jaune et rouge avant de valider.
+          <p v-if="!canSubmit && !isSubmitting" class="warning-text title-with-icon" style="margin-right: 15px;">
+            <AlertTriangle :size="18" />
+            <span>Traitez les fichiers en jaune et rouge avant de valider.</span>
           </p>
-          <button 
-            v-if="!isSubmitting"
-            class="btn btn-primary btn-large" 
-            @click="submitAll"
-            :disabled="isSubmitting || !canSubmit"
-          >
-            {{ isSubmitting ? 'Importation en cours...' : `Envoyer ${filesReadyToSubmit} dictée(s) 🚀` }}
+          <button v-if="!isSubmitting" class="btn btn-primary btn-large btn-with-icon" @click="submitAll"
+            :disabled="isSubmitting || !canSubmit">
+            <Loader2 v-if="isSubmitting" :size="20" class="animate-spin" />
+            <template v-else>
+              <span>Envoyer {{ filesReadyToSubmit }} dictée(s)</span>
+              <Rocket :size="20" />
+            </template>
           </button>
 
           <div v-else class="progress-container">
@@ -123,171 +133,44 @@
     </div>
   </div>
 
-  <div class="modal-overlay" v-if="showCreateModal" @click.self="closeCreateModal">
-    <div class="modal large-modal">
-      <h2 style="color: var(--primary); margin-bottom: 20px;">Créer un nouvel étudiant</h2>
-
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Nom *</label>
-          <input type="text" v-model="newStudentForm.last_name" required>
-        </div>
-        <div class="form-group">
-          <label>Prénom *</label>
-          <input type="text" v-model="newStudentForm.first_name" required>
-        </div>
-        <div class="form-group">
-          <label>Promo</label>
-          <input type="text" v-model="newStudentForm.promo">
-        </div>
-        <div class="form-group">
-          <label>Groupe</label>
-          <select v-model="newStudentForm.group">
-            <option value="">-- Sélectionner --</option>
-            <option value="G0">G0</option>
-            <option value="G1">G1</option>
-            <option value="G2">G2</option>
-            <option value="G3">G3</option>
-            <option value="G4">G4</option>
-            <option value="G5">G5</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Niveau d'appétence (1-4)</label>
-          <input type="number" v-model="newStudentForm.appetence_level" min="1" max="4">
-        </div>
-        <div class="form-group">
-          <label>A une bibliothèque ?</label>
-          <select v-model="newStudentForm.has_library">
-            <option value="">-- Sélectionner --</option>
-            <option value="Oui">Oui</option>
-            <option value="Non">Non</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Support de lecture</label>
-          <select v-model="newStudentForm.reading_support">
-            <option value="">-- Sélectionner --</option>
-            <option value="Ecran">Ecran</option>
-            <option value="Papier">Papier</option>
-            <option value="Beaucoup écran - un peu papier">Beaucoup écran - un peu papier</option>
-            <option value="Beaucoup papier - un peu écran">Beaucoup papier - un peu écran</option>
-          </select>
-        </div>
-        <div class="form-group" style="grid-column: span 2;">
-          <label>Œuvres lues</label>
-          <div class="checkbox-grid">
-            <label v-for="work in readingWorksOptions" :key="work" class="checkbox-label">
-              <input type="checkbox" :value="work" v-model="selectedReadingWorks">
-              {{ work }}
-            </label>
-          </div>
-        </div>
-        <div class="form-group" style="grid-column: span 2;">
-          <label>Motif de lecture</label>
-          <div class="checkbox-grid">
-            <label v-for="motive in motiveOptions" :key="motive" class="checkbox-label">
-              <input type="checkbox" :value="motive" v-model="selectedMotives">
-              {{ motive }}
-            </label>
-          </div>
-        </div>
-        <div class="form-group" style="grid-column: span 2;">
-          <label>Niveau déclaré</label>
-          <div class="radio-grid">
-            <label v-for="level in declaredLevelOptions" :key="level" class="radio-label">
-              <input type="radio" :value="level" v-model="newStudentForm.declared_level">
-              {{ level }}
-            </label>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Diplôme Parent 1</label>
-          <select v-model="newStudentForm.parent_1_degree">
-            <option value="">-- Sélectionner --</option>
-            <option value="Aucun">Aucun</option>
-            <option value="CAP BEP BP">CAP BEP BP</option>
-            <option value="Bac">Bac</option>
-            <option value="Bac+2 BTS Licence">Bac+2 BTS Licence</option>
-            <option value="Bac+4 Master Doctorat">Bac+4 Master Doctorat</option>
-            <option value="Autres">Autres</option>
-            <option value="Je ne sais pas">Je ne sais pas</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>CSP Parent 1</label>
-          <select v-model="newStudentForm.parent_1_csp">
-            <option value="">-- Sélectionner --</option>
-            <option value="Agriculteurs exploitants">Agriculteurs exploitants</option>
-            <option value="Artisans, commerçants, chefs entreprise">Artisans, commerçants, chefs entreprise</option>
-            <option value="Cadres, professions intellectuelles sup.">Cadres, professions intellectuelles sup.</option>
-            <option value="Employés / ouvriers">Employés / ouvriers</option>
-            <option value="Retraités">Retraités</option>
-            <option value="Autres sans activité professionnelle">Autres sans activité professionnelle</option>
-            <option value="Je ne sais pas">Je ne sais pas</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Diplôme Parent 2</label>
-          <select v-model="newStudentForm.parent_2_degree">
-            <option value="">-- Sélectionner --</option>
-            <option value="Aucun">Aucun</option>
-            <option value="CAP BEP BP">CAP BEP BP</option>
-            <option value="Bac">Bac</option>
-            <option value="Bac+2 BTS Licence">Bac+2 BTS Licence</option>
-            <option value="Bac+4 Master Doctorat">Bac+4 Master Doctorat</option>
-            <option value="Autres">Autres</option>
-            <option value="Je ne sais pas">Je ne sais pas</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>CSP Parent 2</label>
-          <select v-model="newStudentForm.parent_2_csp">
-            <option value="">-- Sélectionner --</option>
-            <option value="Agriculteurs exploitants">Agriculteurs exploitants</option>
-            <option value="Artisans, commerçants, chefs entreprise">Artisans, commerçants, chefs entreprise</option>
-            <option value="Cadres, professions intellectuelles sup.">Cadres, professions intellectuelles sup.</option>
-            <option value="Employés / ouvriers">Employés / ouvriers</option>
-            <option value="Retraités">Retraités</option>
-            <option value="Autres sans activité professionnelle">Autres sans activité professionnelle</option>
-            <option value="Je ne sais pas">Je ne sais pas</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="modal-actions" style="margin-top: 25px;">
-        <button class="btn btn-outline" @click="closeCreateModal">Annuler</button>
-        <button class="btn btn-primary" @click="confirmCreateStudent" :disabled="!newStudentForm.first_name || !newStudentForm.last_name">
-          Enregistrer et associer
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <div class="toast-notification" :class="notification.type" v-if="notification.show">
-    <span class="toast-icon">{{ notification.type === 'success' ? '✅' : '❌' }}</span>
-    <span class="toast-message">{{ notification.message }}</span>
-  </div>
-
-  <div class="modal-overlay" v-if="confirmDialog.show" @click.self="resolveConfirm(false)">
-    <div class="modal confirm-modal">
-      <h3 style="color: var(--danger); margin-top: 0;">⚠️ Confirmation requise</h3>
-      <p style="margin: 20px 0; line-height: 1.5; color: var(--text); white-space: pre-wrap;">{{ confirmDialog.message }}</p>
-      <div class="modal-actions">
-        <button class="btn btn-outline" @click="resolveConfirm(false)">Annuler</button>
-        <button class="btn btn-danger" @click="resolveConfirm(true)">Confirmer</button>
-      </div>
-    </div>
-  </div>
+  <StudentFormModal
+    :show="showCreateModal"
+    :student-data="(newStudentForm as Student)"
+    :promotions="promotions"
+    :groups="groups"
+    :is-edit="false"
+    :lock-promotion-id="selectedPromotion === '' ? null : selectedPromotion"
+    @close="showCreateModal = false"
+    @save="handleCreateStudent"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
-import type { Student, Dictation } from '@/types';
+import type { Student, Dictation, Promotion, Group, StudentCreatePayload } from '@/types';
+import { AssessmentType } from '@/types/generated_enums';
+import AppLoading from '@/components/common/AppLoading.vue';
+import {
+  FileText,
+  CheckCircle,
+  UserPlus,
+  AlertTriangle,
+  XCircle,
+  Plus,
+  ArrowRight,
+  Rocket,
+  Loader2
+} from 'lucide-vue-next';
+import { useUiStore } from '@/stores/ui';
+import StudentFormModal from '@/components/students/StudentFormModal.vue';
+
+const ui = useUiStore();
 
 const router = useRouter();
+
+const AssessmentTypes = AssessmentType;
 
 // --- TYPES LOCAUX. ---
 type FileStatus = 'MATCHED' | 'SUGGESTED' | 'UNKNOWN' | 'CONFIRMED' | 'IGNORED';
@@ -310,10 +193,13 @@ const dragOver = ref(false);
 
 const students = ref<Student[]>([]);
 const dictations = ref<Dictation[]>([]);
+const promotions = ref<Promotion[]>([]);
+const groups = ref<Group[]>([]);
 
 // Valeurs globales du formulaire.
-const selectedDictation = ref('');
-const submissionType = ref('Initiale');
+const selectedPromotion = ref<number | ''>('');
+const selectedDictation = ref<number | ''>('');
+const submissionType = ref<AssessmentType>(AssessmentType.INITIAL);
 
 // Liste des fichiers déposés.
 const parsedFiles = ref<ParsedFile[]>([]);
@@ -323,65 +209,49 @@ const importProgress = ref(0);
 const processedCount = ref(0);
 const totalToProcess = ref(0);
 
-// États pour le formulaire.
+// États pour le formulaire de création.
 const showCreateModal = ref(false);
 const editingFileItem = ref<ParsedFile | null>(null);
-
-const newStudentForm = ref({
-  first_name: '', last_name: '', promo: '', group: '', appetence_level: '',
-  has_library: '', reading_support: '', reading_works: '', motive: '',
-  parent_1_degree: '', parent_1_csp: '', parent_2_degree: '', parent_2_csp: '', declared_level: ''
+const newStudentForm = ref<Partial<Student>>({
+  first_name: '',
+  last_name: '',
+  promotion_id: undefined
 });
-
-const readingWorksOptions = [
-  "Romans / écrits littéraires", "Mangas / BD", "Livres de jeux, devinettes et énigmes",
-  "Textes religieux et spirituels", "Presse / revues / articles", "Poésies, poèmes",
-  "Réseaux sociaux", "Cours / livres éducatifs",
-  "Ecrits publicitaires et marketing / modes d'emploi", "Autres livres"
-];
-
-const motiveOptions = [
-  "Apprentissage", "Distraction", "Information"
-];
-
-const declaredLevelOptions = [
-  "Mauvais", "2", "3", "4", "5", "Excellent"
-];
-
-const selectedReadingWorks = ref<string[]>([]);
-const selectedMotives = ref<string[]>([]);
 
 // --- CHARGEMENT. ---
 onMounted(async () => {
   try {
-    const [studentsRes, dictationsRes] = await Promise.all([
+    const [studentsRes, dictationsRes, promoRes, groupRes] = await Promise.all([
       api.getStudents(),
-      api.getDictations()
+      api.getDictations(),
+      api.getPromotions(),
+      api.getGroups()
     ]);
-    students.value = studentsRes.data;
-    dictations.value = dictationsRes.data;
+    students.value = studentsRes;
+    dictations.value = dictationsRes;
+    promotions.value = promoRes;
+    groups.value = groupRes;
   } catch (error) {
     console.error("Erreur de chargement :", error);
+    ui.notify("Erreur lors du chargement des données.", "error");
   } finally {
     isLoading.value = false;
   }
 });
 
-// --- UTILITAIRES (NORMALISATION ET LEVENSHTEIN). ---
+// --- UTILITAIRES. ---
 const normalizeText = (text: string) => {
   return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 };
 
 const levenshtein = (a: string, b: string): number => {
   const matrix = Array.from({ length: a.length + 1 }, () => Array<number>(b.length + 1).fill(0));
-  
   for (let i = 0; i <= a.length; i++) matrix[i]![0] = i;
   for (let j = 0; j <= b.length; j++) matrix[0]![j] = j;
 
   for (let i = 1; i <= a.length; i++) {
     const row = matrix[i]!;
     const prevRow = matrix[i - 1]!;
-    
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
       row[j] = Math.min(
@@ -395,26 +265,47 @@ const levenshtein = (a: string, b: string): number => {
 };
 
 // --- GESTION DES FICHIERS. ---
-const triggerFileInput = () => { if (fileInputRef.value) fileInputRef.value.click(); };
+const handlePromotionChange = () => {
+  if (parsedFiles.value.length > 0) {
+    if (confirm("Changer de promotion va réinitialiser les fichiers déjà chargés. Continuer ?")) {
+      parsedFiles.value = [];
+    }
+  }
+};
+
+const triggerFileInput = () => {
+  if (!selectedPromotion.value) {
+    ui.notify("Veuillez sélectionner une promotion d'abord.", "error");
+    return;
+  }
+  if (fileInputRef.value) fileInputRef.value.click();
+};
 
 const handleDrop = (e: DragEvent) => {
   dragOver.value = false;
+  if (!selectedPromotion.value) {
+    ui.notify("Veuillez sélectionner une promotion d'abord.", "error");
+    return;
+  }
   if (e.dataTransfer?.files) processFiles(Array.from(e.dataTransfer.files));
 };
 
 const handleFileUpload = (event: Event) => {
   const target = event.target as HTMLInputElement;
   if (target.files) processFiles(Array.from(target.files));
-  target.value = ''; 
+  target.value = '';
 };
 
 const processFiles = async (files: File[]) => {
   for (const file of files) {
-    if (file.type !== 'text/plain') continue; 
+    if (file.type !== 'text/plain') continue;
 
     const content = await file.text();
-    const cleanName = file.name.replace('.txt', '').replace(/[-_]/g, ' ').trim();
-    
+
+    const baseName = file.name.replace('.txt', '');
+    const nameParts = baseName.split('_').slice(0, 2);
+    const cleanName = nameParts.join(' ').trim();
+
     const parsedFile: ParsedFile = {
       id: Math.random().toString(36).substr(2, 9),
       file,
@@ -433,14 +324,16 @@ const processFiles = async (files: File[]) => {
 
 const findMatchForFile = (fileItem: ParsedFile) => {
   const normFileName = normalizeText(fileItem.parsedName);
-  
+
+  const studentsInPromo = students.value.filter(s => s.promotion_id === selectedPromotion.value);
+
   let bestMatch: Student | null = null;
   let minDistance = Infinity;
 
-  for (const student of students.value) {
+  for (const student of studentsInPromo) {
     const fullName1 = normalizeText(`${student.last_name} ${student.first_name}`);
     const fullName2 = normalizeText(`${student.first_name} ${student.last_name}`);
-    
+
     if (normFileName === fullName1 || normFileName === fullName2) {
       fileItem.status = 'MATCHED';
       fileItem.studentId = student.id;
@@ -483,63 +376,38 @@ const ignoreFile = (fileItem: ParsedFile) => {
 };
 
 const reprocessFile = (fileItem: ParsedFile) => {
-  findMatchForFile(fileItem); 
+  findMatchForFile(fileItem);
 };
 
+// --- CRÉATION ÉTUDIANT MANQUANT. ---
 const openCreateStudentForm = (fileItem: ParsedFile) => {
   editingFileItem.value = fileItem;
-  const parts = fileItem.parsedName.split(' ');
+
+  const parts = fileItem.parsedName?.split(' ') || [];
   
   newStudentForm.value = {
-    first_name: parts.slice(1).join(' ') || '',
     last_name: parts[0]?.toUpperCase() || '',
-    promo: '', group: '', appetence_level: '', has_library: '',
-    reading_support: '', reading_works: '', motive: '',
-    parent_1_degree: '', parent_1_csp: '', parent_2_degree: '', parent_2_csp: '', declared_level: ''
+    first_name: parts.slice(1).join(' ') || '',
+    promotion_id: selectedPromotion.value === '' ? undefined : selectedPromotion.value,
+    group_id: undefined
   };
 
-  selectedReadingWorks.value = [];
-  selectedMotives.value = [];
-  
   showCreateModal.value = true;
 };
 
-const closeCreateModal = () => {
-  showCreateModal.value = false;
-  editingFileItem.value = null;
-};
-
-const confirmCreateStudent = async () => {
-  if (!editingFileItem.value || !newStudentForm.value.first_name || !newStudentForm.value.last_name) return;
-
-  newStudentForm.value.reading_works = selectedReadingWorks.value.length > 0 
-    ? selectedReadingWorks.value.join(';') 
-    : '';
-
-  newStudentForm.value.motive = selectedMotives.value.length > 0 
-    ? selectedMotives.value.join(';') 
-    : '';
-
+const handleCreateStudent = async (payload: StudentCreatePayload) => {
   try {
-    const dataToSend = Object.fromEntries(
-      Object.entries(newStudentForm.value).map(([k, v]) => {
-        if (v === '') return [k, null];
-        if (k === 'appetence_level' && v !== null) return [k, String(v)];
-        return [k, v];
-      })
-    );
-
-    const newStudent = await api.createStudent(dataToSend as any);
+    const newStudent = await api.createStudent(payload);
     
-    students.value.push(newStudent);
-    
-    editingFileItem.value.status = 'CONFIRMED';
-    editingFileItem.value.studentId = newStudent.id;
+    if (editingFileItem.value) {
+      editingFileItem.value.status = 'CONFIRMED';
+      editingFileItem.value.studentId = newStudent.id;
+    }
 
-    closeCreateModal();
-  } catch (error) {
-    console.error("Erreur de création :", error);
-    showNotification("Impossible de créer l'étudiant.", "error");
+    ui.notify("Étudiant créé et associé !");
+    showCreateModal.value = false;
+  } catch (err) {
+    console.error("Erreur : ", err)
   }
 };
 
@@ -551,7 +419,7 @@ const getStudentName = (uuid: string | null) => {
 
 // --- VALIDATION FINALE. ---
 const canSubmit = computed(() => {
-  return parsedFiles.value.length > 0 && parsedFiles.value.every(f => 
+  return parsedFiles.value.length > 0 && parsedFiles.value.every(f =>
     f.status === 'MATCHED' || f.status === 'CONFIRMED' || f.status === 'IGNORED'
   );
 });
@@ -560,14 +428,9 @@ const filesReadyToSubmit = computed(() => {
   return parsedFiles.value.filter(f => f.status === 'MATCHED' || f.status === 'CONFIRMED').length;
 });
 
-// --- VALIDATION FINALE EN LOTS (CHUNKS). ---
 const submitAll = async () => {
-  if (!selectedDictation.value) {
-    if (typeof showNotification === 'function') {
-      showNotification("⚠️ Veuillez sélectionner une dictée référente avant de lancer l'importation.", "error");
-    } else {
-      alert("⚠️ Veuillez sélectionner une dictée référente avant de lancer l'importation.");
-    }
+  if (!selectedDictation.value || !selectedPromotion.value) {
+    ui.notify("Veuillez vérifier vos sélections.", "error");
     return;
   }
 
@@ -586,7 +449,7 @@ const submitAll = async () => {
       const chunk = filesToProcess.slice(i, i + CHUNK_SIZE);
 
       const payload = chunk.map(f => ({
-        student_uuid: f.studentId as string,
+        student_id: f.studentId as string,
         dictation_id: Number(selectedDictation.value),
         assessment_type: submissionType.value,
         content_student: f.content
@@ -599,411 +462,366 @@ const submitAll = async () => {
     }
 
     setTimeout(() => {
-      showNotification("Succès ! Les dictées ont été importées.", "success");
+      ui.notify("Les dictées ont été importées.", "success");
       setTimeout(() => {
         router.push('/correction');
       }, 1500);
     }, 500);
-    
+
   } catch (error) {
     console.error("Erreur d'import :", error);
-    showNotification("Une erreur est survenue lors de l'envoi en masse.", "error");
+    ui.notify("Erreur lors de l'envoi en masse.", "error");
     isSubmitting.value = false;
   }
-};
-
-// --- NOTIFICATIONS & CONFIRMATIONS CUSTOM. ---
-const notification = ref({ show: false, message: '', type: 'success' });
-const showNotification = (msg: string, type: 'success' | 'error' = 'success') => {
-  notification.value = { show: true, message: msg, type };
-  setTimeout(() => { notification.value.show = false; }, 4000);
-};
-
-const confirmDialog = ref({ show: false, message: '', resolve: (val: boolean) => {} });
-const askConfirm = (msg: string): Promise<boolean> => {
-  return new Promise((resolve) => {
-    confirmDialog.value = { show: true, message: msg, resolve };
-  });
-};
-const resolveConfirm = (val: boolean) => {
-  confirmDialog.value.show = false;
-  confirmDialog.value.resolve(val);
 };
 </script>
 
 <style scoped>
-.header { 
-  display: flex; 
-  align-items: center; 
-  gap: 20px; 
-  margin-bottom: 30px; 
-}
-.header h1 { 
-  font-size: 1.6rem; 
-  color: var(--primary); 
-  margin: 0; 
+.header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 30px;
 }
 
-.form-card { 
-  background: white; 
-  padding: 30px; 
-  border-radius: 12px; 
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
-  border: 1px solid #e1e8ed; 
+.header h1 {
+  font-size: 1.6rem;
+  color: var(--primary);
+  margin: 0;
 }
 
-.grid-2 { 
-  display: grid; 
-  grid-template-columns: 1fr 1fr; 
-  gap: 20px; 
-  padding-bottom: 20px; 
-  border-bottom: 2px solid #f0f2f5; 
+.form-card {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e1e8ed;
 }
 
-.form-group label { 
-  display: block; 
-  margin-bottom: 8px; 
-  font-weight: 600; 
-  color: var(--primary); 
-}
-.form-group select { 
-  width: 100%; 
-  padding: 10px; 
-  border: 1px solid #ccc; 
-  border-radius: 6px; 
-  font-size: 1rem; 
-  outline: none; 
-}
-.form-group select:focus { 
-  border-color: var(--accent); 
-}
-
-/* Drag & Drop Zone. */
-.upload-zone { 
-  border: 2px dashed #bdc3c7; 
-  border-radius: 8px; 
-  padding: 40px 20px; 
-  text-align: center; 
-  background: #f8f9fa; 
-  cursor: pointer; 
-  transition: 0.2s; 
-}
-.upload-zone.drag-over { 
-  border-color: var(--accent); 
-  background: #f0f8ff; 
-}
-.upload-zone i { 
-  font-size: 3rem; 
-  color: #bdc3c7; 
-  display: block; 
-  margin-bottom: 10px; 
-  font-style: normal; 
-}
-.upload-zone h3 { 
-  color: var(--primary); 
-  margin-bottom: 5px; 
-}
-.upload-zone p { 
-  color: #7f8c8d; 
-  font-size: 0.9rem; 
-}
-
-/* Liste des fichiers. */
-.files-list { 
-  margin-top: 30px; 
-  background: #fafafa; 
-  padding: 20px; 
-  border-radius: 8px; 
-  border: 1px solid #eee; 
-}
-.list-title { 
-  margin-top: 0; 
-  color: var(--primary); 
-  font-size: 1.1rem; 
-  margin-bottom: 15px; 
-}
-
-.file-item { 
-  background: white; 
-  border: 1px solid #e1e8ed; 
-  padding: 15px; 
-  border-radius: 6px; 
-  margin-bottom: 10px; 
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
-  transition: 0.2s; 
-  border-left: 5px solid #ccc; 
-}
-.file-item:hover { 
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
-}
-
-/* Couleurs d'état (Bordure gauche). */
-.file-item.status-matched, .file-item.status-confirmed { 
-  border-left-color: #2ecc71; 
-}
-.file-item.status-suggested { 
-  border-left-color: #f1c40f; 
-}
-.file-item.status-unknown { 
-  border-left-color: #e74c3c; 
-}
-.file-item.status-ignored { 
-  border-left-color: #95a5a6; opacity: 0.6; 
-}
-
-.file-info { 
-  display: flex; 
-  flex-direction: column; 
-}
-.file-name { 
-  font-weight: 600; 
-  color: var(--text); 
-}
-.parsed-name { 
-  font-size: 0.85rem; 
-  color: #7f8c8d; 
-  margin-top: 3px; 
-  font-style: italic; 
-}
-
-.file-action { 
-  display: flex; 
-  align-items: center; 
-  gap: 15px; 
-  font-size: 0.9rem; 
-}
-.file-action.success { 
-  color: #27ae60; 
-}
-.file-action.warning { 
-  color: #d35400; 
-  background: #fdfae7; 
-  padding: 8px 12px; 
-  border-radius: 4px; 
-}
-.file-action.danger { 
-  color: #c0392b; 
-  background: #fdedec; 
-  padding: 8px 12px; 
-  border-radius: 4px; 
-}
-
-/* Boutons. */
-.btn-group { 
-  display: flex; 
-  gap: 5px; 
-}
-.btn { 
-  padding: 8px 16px; 
-  border-radius: 6px; 
-  cursor: pointer; 
-  font-weight: 600; 
-  border: none; 
-  transition: 0.2s; 
-}
-.btn-sm { 
-  padding: 5px 10px; 
-  font-size: 0.85rem; 
-}
-.btn-large { 
-  padding: 12px 24px; 
-  font-size: 1.1rem; 
-}
-
-.btn-primary { 
-  background: var(--accent); 
-  color: white; 
-}
-.btn-primary:hover:not(:disabled) { 
-  background: #12876f; 
-}
-.btn-success { 
-  background: #2ecc71; 
-  color: white; 
-}
-.btn-success:hover { 
-  background: #27ae60; 
-}
-.btn-outline { 
-  background: transparent; 
-  border: 1px solid #ccc; 
-  color: var(--text); 
-}
-.btn-outline:hover { 
-  background: #eee; 
-}
-.btn:disabled { 
-  opacity: 0.5; 
-  cursor: not-allowed; 
-}
-
-.actions { 
-  display: flex; 
-  justify-content: flex-end; 
-  align-items: center; 
-  margin-top: 25px; 
-  border-top: 2px solid #f0f2f5; 
-  padding-top: 20px; 
-}
-.warning-text { 
-  color: #e67e22; 
-  font-weight: bold; 
-}
-
-/* --- Modale Étudiant. --- */
-.modal-overlay { 
-  position: fixed; 
-  top: 0; left: 0; right: 0; bottom: 0; 
-  background: rgba(0,0,0,0.6); 
-  z-index: 1000; 
-  display: flex; 
-  justify-content: center; 
-  align-items: center; 
-}
-.modal { 
-  background: white; 
-  padding: 30px; 
-  border-radius: 8px; 
-  width: 500px; 
-  max-width: 90%; 
-  max-height: 90vh; 
-  overflow-y: auto; 
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
-}
-.large-modal {
-  width: 700px;
-}
-.form-grid {
+.grid-3 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-}
-.form-group input[type="text"], 
-.form-group input[type="number"], 
-.form-group select { 
-  width: 100%; 
-  padding: 8px 12px; 
-  border: 1px solid #ccc; 
-  border-radius: 4px; 
-  font-family: inherit; 
-  box-sizing: border-box;
-  transition: 0.2s border-color;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #f0f2f5;
 }
 
-.form-group input[type="text"]:focus,
-.form-group input[type="number"]:focus,
-.form-group select:focus {
-  border-color: var(--accent);
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.form-group select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
   outline: none;
 }
-.form-group select {
-  cursor: pointer;
-  background-color: white;
-}
-.modal-actions { 
-  display: flex; 
-  justify-content: flex-end; 
-  gap: 10px; 
-}
-.checkbox-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
-  margin-top: 10px;
-  background: #f8f9fa;
-  padding: 15px;
-  border-radius: 6px;
-  border: 1px solid #e1e8ed;
-}
-.radio-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  margin-top: 10px;
-  background: #f8f9fa;
-  padding: 15px;
-  border-radius: 6px;
-  border: 1px solid #e1e8ed;
-}
-.checkbox-label, .radio-label {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-weight: 500;
-  font-size: 0.9rem;
-  color: var(--text);
-  cursor: pointer;
-  line-height: 1.3;
-}
-.checkbox-label input[type="checkbox"],
-.radio-label input[type="radio"] {
-  width: 16px;
-  height: 16px;
-  margin-top: 2px;
-  cursor: pointer;
-  accent-color: var(--accent);
+
+.form-group select:focus {
+  border-color: var(--accent);
 }
 
-/* --- NOTIFICATIONS & CONFIRMATIONS. --- */
-.toast-notification {
-  position: fixed; 
-  top: 20px; 
-  right: 20px; 
-  padding: 15px 25px; 
+.form-group select:disabled {
+  background-color: #f1f1f1;
+  cursor: not-allowed;
+}
+
+/* Upload Zone. */
+.upload-zone {
+  border: 2px dashed #bdc3c7;
   border-radius: 8px;
-  display: flex; 
-  align-items: center; 
-  gap: 12px; 
-  font-weight: 500;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.2); 
-  z-index: 9999;
-  animation: slideIn 0.3s ease-out;
-}
-.toast-notification.success { 
-  background: #d4edda; 
-  color: #155724; 
-  border-left: 5px solid #28a745; 
-}
-.toast-notification.error { 
-  background: #f8d7da; 
-  color: #721c24; 
-  border-left: 5px solid #dc3545; 
-}
-.toast-icon { 
-  font-size: 1.2rem; 
-}
-
-@keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-
-.confirm-modal { 
-  width: 400px; 
-  text-align: center; 
-}
-.btn-danger { 
-  background: var(--danger); 
-  color: white; 
-  border: none; 
-  padding: 8px 16px; 
-  border-radius: 4px; 
-  cursor: pointer; 
-  font-weight: bold; 
+  padding: 40px 20px;
+  text-align: center;
+  background: #f8f9fa;
+  cursor: pointer;
   transition: 0.2s;
 }
-.btn-danger:hover { 
-  background: #c0392b; 
-  transform: scale(1.05); 
-}
-.confirm-modal .modal-actions {
-  justify-content: center;
-  margin-top: 30px;
+
+.upload-zone.drag-over {
+  border-color: var(--accent);
+  background: #f0f8ff;
 }
 
-/* Barre de progression. */
+.upload-zone.disabled {
+  border-color: #ecf0f1;
+  background: #fdfdfd;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.upload-zone i {
+  font-size: 3rem;
+  color: #bdc3c7;
+  display: block;
+  margin-bottom: 10px;
+  font-style: normal;
+}
+
+.upload-zone h3 {
+  color: var(--primary);
+  margin-bottom: 5px;
+}
+
+.upload-zone p {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+.files-list {
+  margin-top: 30px;
+  background: #fafafa;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.list-title {
+  margin-top: 0;
+  color: var(--primary);
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+}
+
+.file-item {
+  background: white;
+  border: 1px solid #e1e8ed;
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: 0.2s;
+  border-left: 5px solid #ccc;
+}
+
+.file-item:hover {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.file-item.status-matched,
+.file-item.status-confirmed {
+  border-left-color: #2ecc71;
+}
+
+.file-item.status-suggested {
+  border-left-color: #f1c40f;
+}
+
+.file-item.status-unknown {
+  border-left-color: #e74c3c;
+}
+
+.file-item.status-ignored {
+  border-left-color: #95a5a6;
+  opacity: 0.6;
+}
+
+.file-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.file-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.parsed-name {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  margin-top: 3px;
+  font-style: italic;
+}
+
+.file-action {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-size: 0.9rem;
+}
+
+.file-action.success {
+  color: #27ae60;
+}
+
+.file-action.warning {
+  color: #d35400;
+  background: #fdfae7;
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+.file-action.danger {
+  color: #c0392b;
+  background: #fdedec;
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+.btn-group {
+  display: flex;
+  gap: 5px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  border: none;
+  transition: 0.2s;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 0.85rem;
+}
+
+.btn-large {
+  padding: 12px 24px;
+  font-size: 1.1rem;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #12876f;
+}
+
+.btn-success {
+  background: #2ecc71;
+  color: white;
+}
+
+.btn-success:hover {
+  background: #27ae60;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid #ccc;
+  color: var(--text);
+}
+
+.btn-outline:hover {
+  background: #eee;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 25px;
+  border-top: 2px solid #f0f2f5;
+  padding-top: 20px;
+}
+
+.warning-text {
+  color: #e67e22;
+  font-weight: bold;
+}
+
+/* Icône dans la zone d'upload */
+.upload-icon {
+  color: var(--primary);
+  opacity: 0.5;
+  margin-bottom: 15px;
+}
+
+.drag-over .upload-icon {
+  color: var(--accent);
+  opacity: 1;
+  transform: scale(1.1);
+  transition: 0.3s;
+}
+
+/* Alignement dans les bandeaux d'action */
+.file-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 15px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.file-action.success {
+  background-color: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.file-action.warning {
+  background-color: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.file-action.danger {
+  background-color: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.warning-text {
+  color: #92400e;
+  font-weight: 500;
+}
+
+.parsed-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  margin-left: 10px;
+  font-style: italic;
+}
+
+/* Style pour le bouton principal d'envoi */
+.btn-large {
+  padding: 15px 30px;
+  font-size: 1.1rem;
+  width: 100%;
+  /* Optionnel : pour qu'il prenne toute la largeur en bas de page */
+  margin-top: 20px;
+  box-shadow: 0 4px 6px rgba(26, 188, 156, 0.2);
+}
+
+.btn-large:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(26, 188, 156, 0.3);
+}
+
+/* Animation de rotation pour le loader */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .progress-container {
   width: 100%;
   max-width: 400px;
@@ -1012,20 +830,23 @@ const resolveConfirm = (val: boolean) => {
   flex-direction: column;
   align-items: flex-end;
 }
+
 .progress-text {
   font-weight: bold;
   color: var(--primary);
   margin-bottom: 8px;
   font-size: 0.95rem;
 }
+
 .progress-bar {
   width: 100%;
   height: 12px;
   background-color: #ecf0f1;
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
 }
+
 .progress-fill {
   height: 100%;
   background-color: var(--accent);

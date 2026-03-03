@@ -1,12 +1,18 @@
-from typing import Dict, Optional
+from typing import Any, Dict
+
 from pydantic import BaseModel
+
 
 # Dashboard Étude Rousseau.
 class RousseauStatsResponse(BaseModel):
-    tools_vs_dictation: Dict[str, Dict[str, float]]
-    equivalence_g2_g5: Dict[str, float]
-    teacher_factor: Dict[str, float]
-    sociocultural_impact: Dict[str, Dict[str, float]]
+    h1_summary: Dict[str, Any]
+    h2_equivalence: Dict[str, Any]
+    h3_teacher: Dict[str, float]
+    h4_sociocultural: Dict[str, Any]
+
+    class Config:
+        from_attributes = True
+
 
 # Dashboard É.M.I.L.E.
 class EmileStatsResponse(BaseModel):

@@ -1,5 +1,7 @@
 from sqlmodel import Session, select
-from app.models import AssessmentResult, Student, Submission
+
+from app.models import AssessmentResult, AssessmentType, Student, Submission
+
 
 class StatsService:
     def __init__(self, session: Session):
@@ -8,166 +10,218 @@ class StatsService:
     def get_rousseau_dashboard_stats(self) -> dict:
         students = self.session.exec(select(Student)).all()
         assessments = self.session.exec(select(AssessmentResult)).all()
-        
+
         initial_scores = {}
         final_scores = {}
-        
+
         for student in students:
             for sub in student.submissions:
-                if sub.assessment_type.name == "INITIAL" and sub.final_score is not None:
+                if (
+                    sub.assessment_type == AssessmentType.INITIAL
+                    and sub.final_score is not None
+                ):
                     initial_scores[student.id] = sub.final_score
-                elif sub.assessment_type.name == "FINAL" and sub.final_score is not None:
+                elif (
+                    sub.assessment_type == AssessmentType.FINAL
+                    and sub.final_score is not None
+                ):
                     final_scores[student.id] = sub.final_score
-
-        initial_g0_g4 = [
-            score for s_id, score in initial_scores.items() 
-            if any(s.id == s_id and s.group and s.group.name != "G5" for s in students)
-        ]
-        avg_initial_g0_g4 = sum(initial_g0_g4) / len(initial_g0_g4) if initial_g0_g4 else 0.0
 
         progressions = {}
         for s in students:
-            if s.id in final_scores:
-                f_score = final_scores[s.id]
-                if s.group and s.group.name == "G5" and s.id not in initial_scores:
-                    i_score = avg_initial_g0_g4
-                else:
-                    i_score = initial_scores.get(s.id)
-                
-                if i_score is not None:
-                    progressions[s.id] = f_score - i_score
+            if s.id in final_scores and s.id in initial_scores:
+                progressions[s.id] = abs(final_scores[s.id] - initial_scores[s.id])
 
-        def safe_avg(scores_list):
-            return round(sum(scores_list) / len(scores_list), 2) if scores_list else 0.0
+        def safe_avg(scores):
+            return round(sum(scores) / len(scores), 2) if scores else 0.0
 
-        # --- HYPOTHÈSE 1 : Outils (VD2) vs Dictées (VD1). ---
-        vd1_initial_vals = [
-            initial_scores.get(s.id, avg_initial_g0_g4 if (s.group and s.group.name == "G5") else None) 
-            for s in students if s.group and s.group.name != "G0" and s.id in final_scores
-        ]
-        vd1_final_vals = [
-            final_scores[s.id] for s in students if s.group and s.group.name != "G0" and s.id in final_scores
-        ]
+        def get_val(enum_member):
+            return enum_member.value if hasattr(enum_member, "value") else enum_member
 
-        vd2_initial_vals = [a.score for a in assessments if a.assessment_type.name == "INITIAL" and a.student.group.name != "G0"]
-        vd2_final_vals = [a.score for a in assessments if a.assessment_type.name == "FINAL" and a.student.group.name != "G0"]
+        promotions = sorted(
+            list(set(s.promotion.name for s in students if s.promotion))
+        )
 
-        vd1_initial_vals = [v for v in vd1_initial_vals if v is not None]
-
-        # --- HYPOTHÈSE 2 : Équivalence G2 vs G5. ---
-        final_g2 = [final_scores[s.id] for s in students if s.group and s.group.name == "G2" and s.id in final_scores]
-        final_g5 = [final_scores[s.id] for s in students if s.group and s.group.name == "G5" and s.id in final_scores]
-
-        # --- HYPOTHÈSE 3 : Facteur Enseignant (G4 vs Autres G2/G3/G5). ---
-        final_g4 = [final_scores[s.id] for s in students if s.group and s.group.name == "G4" and s.id in final_scores]
-        final_others = [final_scores[s.id] for s in students if s.group and s.group.name in ["G2", "G3", "G5"] and s.id in final_scores]
-
-        # --- HYPOTHÈSE 4 : Socioculturel (Lecture vs Progression). ---
-        categories = {
-            "Appétence à la lecture": {},
-            "Présence d'une bibliothèque": {},
-            "Support de lecture": {},
-            "CSP Parents": {},
-            "Diplôme Parents": {},
-            "Niveau déclaré": {},
-            "Œuvres lues": {},
-            "Motifs de lecture": {}
+        h1_final = {
+            "labels": promotions,
+            "dictation_initial": [],
+            "dictation_final": [],
+            "tools_initial": [],
+            "tools_final": [],
         }
-        
+
+        h2_final = {
+            "labels": promotions,
+            "g2_final": [],
+            "g2_progress": [],
+            "g5_final": [],
+            "g5_progress": [],
+        }
+
+        for p_name in promotions:
+            p_st = [
+                s
+                for s in students
+                if s.promotion and s.promotion.name == p_name and s.id in final_scores
+            ]
+
+            vd1_i = [
+                initial_scores.get(s.id)
+                for s in p_st
+                if s.group and s.group.name != "G0"
+            ]
+            vd1_i = [v for v in vd1_i if v is not None]
+
+            vd1_f = [
+                final_scores[s.id] for s in p_st if s.group and s.group.name != "G0"
+            ]
+
+            vd2_i = [
+                a.score
+                for a in assessments
+                if a.assessment_type == AssessmentType.INITIAL
+                and a.student.promotion
+                and a.student.promotion.name == p_name
+            ]
+            vd2_f = [
+                a.score
+                for a in assessments
+                if a.assessment_type == AssessmentType.FINAL
+                and a.student.promotion
+                and a.student.promotion.name == p_name
+            ]
+
+            h1_final["dictation_initial"].append(safe_avg(vd1_i))
+            h1_final["dictation_final"].append(safe_avg(vd1_f))
+            h1_final["tools_initial"].append(safe_avg(vd2_i))
+            h1_final["tools_final"].append(safe_avg(vd2_f))
+
+            # H2 : Progression stricte
+            g2_s = [
+                final_scores[s.id] for s in p_st if s.group and s.group.name == "G2"
+            ]
+            g2_p = [
+                progressions[s.id]
+                for s in p_st
+                if s.group and s.group.name == "G2" and s.id in progressions
+            ]
+            g5_s = [
+                final_scores[s.id] for s in p_st if s.group and s.group.name == "G5"
+            ]
+            g5_p = [
+                progressions[s.id]
+                for s in p_st
+                if s.group and s.group.name == "G5" and s.id in progressions
+            ]
+
+            h2_final["g2_final"].append(safe_avg(g2_s))
+            h2_final["g2_progress"].append(safe_avg(g2_p))
+            h2_final["g5_final"].append(safe_avg(g5_s))
+            h2_final["g5_progress"].append(safe_avg(g5_p))
+
+        # H3
+        f_g4 = [
+            final_scores[s.id]
+            for s in students
+            if s.id in final_scores and s.group and s.group.name == "G4"
+        ]
+        f_auto = [
+            final_scores[s.id]
+            for s in students
+            if s.id in final_scores and s.group and s.group.name in ["G2", "G3", "G5"]
+        ]
+
+        # H4
+        h4_results = {
+            "Catégorie socio-culturelle": {"CSP Parents": {}, "Diplôme Parents": {}},
+            "Pratique de la lecture": {
+                "Appétence": {},
+                "Bibliothèque": {},
+                "Support": {},
+                "Œuvres lues": {},
+                "Motifs": {},
+            },
+            "Orthographe, grammaire, conjugaison": {"Niveau déclaré": {}},
+        }
+
+        def add_s(fam, cat, lab, s_id):
+            if not lab or lab == "None":
+                lab = "Non renseigné"
+            t = h4_results[fam][cat].setdefault(lab, {"Initial": [], "Progress": []})
+            if s_id in initial_scores:
+                t["Initial"].append(initial_scores[s_id])
+            if s_id in progressions:
+                t["Progress"].append(progressions[s_id])
+
         for s in students:
-            if s.id in progressions:
-                prog = progressions[s.id]
-                
-                # 1. Appétence.
-                app = s.appetence_level if getattr(s, 'appetence_level', None) else "Non renseigné"
-                categories["Appétence à la lecture"].setdefault(f"Niveau {app}" if app != "Non renseigné" else app, []).append(prog)
-                
-                # 2. Bibliothèque.
-                bib = s.has_library.value if getattr(s, 'has_library', None) else "Non renseigné"
-                categories["Présence d'une bibliothèque"].setdefault(str(bib), []).append(prog)
-                
-                # 3. Support.
-                sup = s.reading_support.value if getattr(s, 'reading_support', None) else "Non renseigné"
-                categories["Support de lecture"].setdefault(str(sup), []).append(prog)
-                
-                # 4. CSP Parents.
-                csps = set()
-                if getattr(s, 'parent_1_csp', None): csps.add(s.parent_1_csp.value)
-                if getattr(s, 'parent_2_csp', None): csps.add(s.parent_2_csp.value)
-                
-                if not csps:
-                    categories["CSP Parents"].setdefault("Non renseigné", []).append(prog)
+            for csp in filter(None, {get_val(s.parent_1_csp), get_val(s.parent_2_csp)}):
+                add_s("Catégorie socio-culturelle", "CSP Parents", str(csp), s.id)
+            for deg in filter(
+                None, {get_val(s.parent_1_degree), get_val(s.parent_2_degree)}
+            ):
+                add_s("Catégorie socio-culturelle", "Diplôme Parents", str(deg), s.id)
+            add_s(
+                "Pratique de la lecture",
+                "Appétence",
+                f"Niveau {s.appetence_level}" if s.appetence_level else None,
+                s.id,
+            )
+            add_s(
+                "Pratique de la lecture", "Bibliothèque", get_val(s.has_library), s.id
+            )
+            add_s("Pratique de la lecture", "Support", get_val(s.reading_support), s.id)
+            if s.reading_works:
+                for w in s.reading_works.split(";"):
+                    add_s("Pratique de la lecture", "Œuvres lues", w.strip(), s.id)
+            if s.motive:
+                for m in s.motive.split(";"):
+                    add_s("Pratique de la lecture", "Motifs", m.strip(), s.id)
+            add_s(
+                "Orthographe, grammaire, conjugaison",
+                "Niveau déclaré",
+                f"Niveau {s.declared_level}" if s.declared_level else None,
+                s.id,
+            )
+
+        h4_final = {}
+        NIVEAU_ORDER = {
+            "Niveau Mauvais": 0,
+            "Niveau 1": 1,
+            "Niveau 2": 2,
+            "Niveau 3": 3,
+            "Niveau 4": 4,
+            "Niveau 5": 5,
+            "Niveau Excellent": 6,
+        }
+
+        for family, categories in h4_results.items():
+            h4_final[family] = {}
+            for cat, data in categories.items():
+                items = list(data.items())
+
+                if cat in ["Appétence", "Niveau déclaré"]:
+                    items.sort(key=lambda x: NIVEAU_ORDER.get(x[0], 90))
                 else:
-                    for csp in csps:
-                        categories["CSP Parents"].setdefault(str(csp), []).append(prog)
+                    items.sort(key=lambda x: safe_avg(x[1]["Progress"]), reverse=True)
 
-                # 5. Degree Parents.
-                degrees = set()
-                if getattr(s, 'parent_1_degree', None): degrees.add(s.parent_1_degree.value)
-                if getattr(s, 'parent_2_degree', None): degrees.add(s.parent_2_degree.value)
-                
-                if not degrees:
-                    categories["Diplôme Parents"].setdefault("Non renseigné", []).append(prog)
-                else:
-                    for degree in degrees:
-                        categories["Diplôme Parents"].setdefault(str(degree), []).append(prog)
-
-                # 6. Niveau déclaré.
-                niv = s.declared_level if getattr(s, 'declared_level', None) else "Non renseigné"
-                categories["Niveau déclaré"].setdefault(f"Niveau {niv}" if niv != "Non renseigné" else niv, []).append(prog)
-
-                # 7. Œuvres lues.
-                rw_val = getattr(s, 'reading_works', None)
-                if rw_val:
-                    works = [w.strip() for w in rw_val.split(';') if w.strip()]
-                    if works:
-                        for w in works:
-                            categories["Œuvres lues"].setdefault(w, []).append(prog)
-                    else:
-                        categories["Œuvres lues"].setdefault("Non renseigné", []).append(prog)
-                else:
-                    categories["Œuvres lues"].setdefault("Non renseigné", []).append(prog)
-
-                # 8. Motif de lecture.
-                mot_val = getattr(s, 'motive', None)
-                if mot_val:
-                    motives = [m.strip() for m in mot_val.split(';') if m.strip()]
-                    if motives:
-                        for m in motives:
-                            categories["Motifs de lecture"].setdefault(m, []).append(prog)
-                    else:
-                        categories["Motifs de lecture"].setdefault("Non renseigné", []).append(prog)
-                else:
-                    categories["Motifs de lecture"].setdefault("Non renseigné", []).append(prog)
-
-        sociocultural_impact = {}
-        for cat_name, val_dict in categories.items():
-            sociocultural_impact[cat_name] = {
-                k: safe_avg(v) for k, v in sorted(val_dict.items())
-            }
+                h4_final[family][cat] = {
+                    label: {
+                        "Initial": safe_avg(v["Initial"]),
+                        "Progress": safe_avg(v["Progress"]),
+                    }
+                    for label, v in items
+                }
 
         return {
-            "tools_vs_dictation": {
-                "VD1 (Dictées - Moyenne malus)": {
-                    "Initial": safe_avg(vd1_initial_vals),
-                    "Final": safe_avg(vd1_final_vals)
-                },
-                "VD2 (Outils - Score)": {
-                    "Initial": safe_avg(vd2_initial_vals),
-                    "Final": safe_avg(vd2_final_vals)
-                }
+            "h1_summary": h1_final,
+            "h2_equivalence": h2_final,
+            "h3_teacher": {
+                "Accompagnement Humain (G4)": safe_avg(f_g4),
+                "Autonomie / Outils (G2/G3/G5)": safe_avg(f_auto),
             },
-            "equivalence_g2_g5": {
-                "Score Final G2": safe_avg(final_g2),
-                "Score Final G5": safe_avg(final_g5)
-            },
-            "teacher_factor": {
-                "Accompagnement Humain (G4)": safe_avg(final_g4),
-                "Autonomie / Outils (G2, G3, G5)": safe_avg(final_others)
-            },
-            "sociocultural_impact": sociocultural_impact
+            "h4_sociocultural": h4_final,
         }
-    
+
     def get_emile_dashboard_stats(self) -> dict:
         students = self.session.exec(select(Student)).all()
         submissions = self.session.exec(select(Submission)).all()
@@ -177,19 +231,27 @@ class StatsService:
 
         initial_scores = {}
         final_scores = {}
-        
+
         for student in students:
             for sub in student.submissions:
-                if sub.assessment_type.name == "INITIAL" and sub.final_score is not None:
+                if (
+                    sub.assessment_type.name == "INITIAL"
+                    and sub.final_score is not None
+                ):
                     initial_scores[student.id] = sub.final_score
-                elif sub.assessment_type.name == "FINAL" and sub.final_score is not None:
+                elif (
+                    sub.assessment_type.name == "FINAL" and sub.final_score is not None
+                ):
                     final_scores[student.id] = sub.final_score
 
         initial_g0_g4 = [
-            score for s_id, score in initial_scores.items() 
+            score
+            for s_id, score in initial_scores.items()
             if any(s.id == s_id and s.group and s.group.name != "G5" for s in students)
         ]
-        avg_initial_g0_g4 = sum(initial_g0_g4) / len(initial_g0_g4) if initial_g0_g4 else 0.0
+        avg_initial_g0_g4 = (
+            sum(initial_g0_g4) / len(initial_g0_g4) if initial_g0_g4 else 0.0
+        )
 
         group_distribution = {}
         for s in students:
@@ -197,59 +259,79 @@ class StatsService:
             group_distribution[g_name] = group_distribution.get(g_name, 0) + 1
 
         valid_final_scores = list(final_scores.values())
-        global_average = round(sum(valid_final_scores) / len(valid_final_scores), 2) if valid_final_scores else 0.0
+        global_average = (
+            round(sum(valid_final_scores) / len(valid_final_scores), 2)
+            if valid_final_scores
+            else 0.0
+        )
 
         promo_data = {}
         group_data = {}
 
         tool_i_g2, tool_f_g2, tool_i_g5, tool_f_g5 = [], [], [], []
         hr_i_human, hr_f_human, hr_i_robot, hr_f_robot = [], [], [], []
-        mot_i_g1, mot_f_g1, mot_i_g2, mot_f_g2, mot_i_g3, mot_f_g3 = [], [], [], [], [], []
+        mot_i_g1, mot_f_g1, mot_i_g2, mot_f_g2, mot_i_g3, mot_f_g3 = (
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+        )
 
         for s in [st for st in students if st.id in final_scores]:
             f_score = final_scores[s.id]
             i_score = initial_scores.get(s.id)
-            
+
             if i_score is None and s.group and s.group.name == "G5":
                 i_score = avg_initial_g0_g4
 
             p_name = s.promo or "Sans promo"
             if p_name not in promo_data:
                 promo_data[p_name] = {"init": [], "fin": []}
-            if i_score is not None: promo_data[p_name]["init"].append(i_score)
+            if i_score is not None:
+                promo_data[p_name]["init"].append(i_score)
             promo_data[p_name]["fin"].append(f_score)
 
             if s.group:
                 g_val = s.group.value
                 g_code = s.group.name
-                
+
                 if g_val not in group_data:
                     group_data[g_val] = {"init": [], "fin": []}
-                if i_score is not None: group_data[g_val]["init"].append(i_score)
+                if i_score is not None:
+                    group_data[g_val]["init"].append(i_score)
                 group_data[g_val]["fin"].append(f_score)
 
                 if g_code == "G2":
-                    if i_score is not None: tool_i_g2.append(i_score)
+                    if i_score is not None:
+                        tool_i_g2.append(i_score)
                     tool_f_g2.append(f_score)
                 elif g_code == "G5":
-                    if i_score is not None: tool_i_g5.append(i_score)
+                    if i_score is not None:
+                        tool_i_g5.append(i_score)
                     tool_f_g5.append(f_score)
 
                 if g_code == "G4":
-                    if i_score is not None: hr_i_human.append(i_score)
+                    if i_score is not None:
+                        hr_i_human.append(i_score)
                     hr_f_human.append(f_score)
                 elif g_code in ["G2", "G3", "G5"]:
-                    if i_score is not None: hr_i_robot.append(i_score)
+                    if i_score is not None:
+                        hr_i_robot.append(i_score)
                     hr_f_robot.append(f_score)
 
                 if g_code == "G1":
-                    if i_score is not None: mot_i_g1.append(i_score)
+                    if i_score is not None:
+                        mot_i_g1.append(i_score)
                     mot_f_g1.append(f_score)
                 elif g_code == "G2":
-                    if i_score is not None: mot_i_g2.append(i_score)
+                    if i_score is not None:
+                        mot_i_g2.append(i_score)
                     mot_f_g2.append(f_score)
                 elif g_code == "G3":
-                    if i_score is not None: mot_i_g3.append(i_score)
+                    if i_score is not None:
+                        mot_i_g3.append(i_score)
                     mot_f_g3.append(f_score)
 
         def safe_avg(scores_list):
@@ -259,7 +341,7 @@ class StatsService:
             p: {"Initial": safe_avg(data["init"]), "Final": safe_avg(data["fin"])}
             for p, data in promo_data.items()
         }
-        
+
         group_averages = {
             g: {"Initial": safe_avg(data["init"]), "Final": safe_avg(data["fin"])}
             for g, data in group_data.items()
@@ -272,18 +354,38 @@ class StatsService:
             "group_distribution": dict(sorted(group_distribution.items())),
             "group_averages": dict(sorted(group_averages.items())),
             "promo_averages": dict(sorted(promo_averages.items())),
-            
             "comparison_tool": {
-                "Projet Voltaire (G2)": {"Initial": safe_avg(tool_i_g2), "Final": safe_avg(tool_f_g2)},
-                "Écri+ (G5)": {"Initial": safe_avg(tool_i_g5), "Final": safe_avg(tool_f_g5)}
+                "Projet Voltaire (G2)": {
+                    "Initial": safe_avg(tool_i_g2),
+                    "Final": safe_avg(tool_f_g2),
+                },
+                "Écri+ (G5)": {
+                    "Initial": safe_avg(tool_i_g5),
+                    "Final": safe_avg(tool_f_g5),
+                },
             },
             "comparison_human_robot": {
-                "Correction Humaine (G4)": {"Initial": safe_avg(hr_i_human), "Final": safe_avg(hr_f_human)},
-                "Correction IA/Outil (G2, G3, G5)": {"Initial": safe_avg(hr_i_robot), "Final": safe_avg(hr_f_robot)}
+                "Correction Humaine (G4)": {
+                    "Initial": safe_avg(hr_i_human),
+                    "Final": safe_avg(hr_f_human),
+                },
+                "Correction IA/Outil (G2, G3, G5)": {
+                    "Initial": safe_avg(hr_i_robot),
+                    "Final": safe_avg(hr_f_robot),
+                },
             },
             "comparison_motivation": {
-                "Autonomie (G1)": {"Initial": safe_avg(mot_i_g1), "Final": safe_avg(mot_f_g1)},
-                "Jalons obligatoires (G2)": {"Initial": safe_avg(mot_i_g2), "Final": safe_avg(mot_f_g2)},
-                "Salle (G3)": {"Initial": safe_avg(mot_i_g3), "Final": safe_avg(mot_f_g3)}
-            }
+                "Autonomie (G1)": {
+                    "Initial": safe_avg(mot_i_g1),
+                    "Final": safe_avg(mot_f_g1),
+                },
+                "Jalons obligatoires (G2)": {
+                    "Initial": safe_avg(mot_i_g2),
+                    "Final": safe_avg(mot_f_g2),
+                },
+                "Salle (G3)": {
+                    "Initial": safe_avg(mot_i_g3),
+                    "Final": safe_avg(mot_f_g3),
+                },
+            },
         }

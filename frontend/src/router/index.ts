@@ -1,13 +1,24 @@
 import { createRouter, createWebHistory } from 'vue-router'
+
+// LES 4 RUBRIQUES PRINCIPALES.
 import DashboardView from '../views/DashboardView.vue'
 import EmileDashboardView from '@/views/EmileDashboardView.vue'
+import EtudiantsView from '@/views/EtudiantsView.vue'
+import GestionEtudiantsView from '@/views/GestionEtudiantsView.vue'
+
+// SOUS-RUBRIQUES DE 'ÉTUDE ROUSSEAU' (DashboardView).
+import ImportEtudeView from '@/views/ImportEtudeView.vue'
+import ImportResultats from '@/views/ImportResultats.vue'
+
+// SOUS-RUBRIQUES DE 'EMILE DASHBOARD' (DashboardView).
 import EmileGestionView from '@/views/EmileGestionView.vue'
+import EmileAnalyseView from '@/views/EmileAnalyseView.vue'
+import EmileReglesView from '@/views/EmileReglesView.vue'
+
+// PAGES DE 'GESTION DES DICTÉES' (EmileGestionView).
 import CorrectionView from '@/views/CorrectionView.vue'
 import ImportDicteeView from '@/views/ImportDicteeView.vue'
 import ReferenceDicteeView from '@/views/ReferenceDicteeView.vue'
-import EmileAnalyseView from '@/views/EmileAnalyseView.vue'
-import EmileReglesView from '@/views/EmileReglesView.vue'
-import EtudiantsView from '@/views/EtudiantsView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -16,6 +27,16 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: DashboardView
+    },
+    {
+      path: '/import-etude',
+      name: 'import-etude',
+      component: ImportEtudeView
+    },
+    {
+      path: '/import-resultats',
+      name: 'import-resultats',
+      component: ImportResultats
     },
     {
       path: '/emile',
@@ -56,6 +77,11 @@ const router = createRouter({
       path: '/etudiants',
       name: 'etudiants',
       component: EtudiantsView
+    },
+    {
+      path: '/gestion-etudiants',
+      name: 'gestion-etudiants',
+      component: GestionEtudiantsView
     }
   ],
 })

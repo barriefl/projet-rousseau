@@ -2,12 +2,10 @@
   <div class="analyse-view">
     <div class="header">
       <button class="btn btn-outline" @click="router.push('/gestion')">← Retour</button>
-      <h1>📊 Tableau de bord & Progression</h1>
+      <h1>Tableau de bord & Progression</h1>
     </div>
 
-    <div v-if="isLoading" class="loading">
-      ⏳ Analyse des données en cours...
-    </div>
+    <AppLoading v-if="isLoading" message="Chargement des étudiants et de leur progrès..." />
 
     <div v-else>
       <div class="kpi-grid">
@@ -35,7 +33,7 @@
         <div class="table-header">
           <h3>Détail par étudiant</h3>
           <div class="search-box">
-            <input type="text" v-model="searchQuery" placeholder="Rechercher un étudiant...">
+            <input type="text" v-model="searchQuery" placeholder="Rechercher un étudiant ou un groupe...">
           </div>
         </div>
 
@@ -52,29 +50,30 @@
           <tbody>
             <tr v-for="student in filteredStudents" :key="student.id">
               <td><strong>{{ student.last_name }} {{ student.first_name }}</strong></td>
-              <td><span class="badge-group">{{ student.group || '-' }}</span></td>
-              
+              <td><span class="badge-group">{{ student.group_name || '-' }}</span></td>
+
               <td>
                 <span v-if="student.score_initial !== null">{{ student.score_initial }} pts</span>
                 <span v-else class="text-muted">Non passée</span>
               </td>
-              
+
               <td>
                 <span v-if="student.score_final !== null">{{ student.score_final }} pts</span>
                 <span v-else class="text-muted">Non passée</span>
               </td>
-              
+
               <td>
-                <span v-if="student.progress !== null" 
-                      class="badge-progress" 
-                      :class="student.progress < 0 ? 'bg-success' : (student.progress > 0 ? 'bg-danger' : 'bg-neutral')">
+                <span v-if="typeof student.progress === 'number'" class="badge-progress"
+                  :class="student.progress < 0 ? 'bg-success' : (student.progress > 0 ? 'bg-danger' : 'bg-neutral')">
                   {{ student.progress > 0 ? '+' : '' }}{{ student.progress }}
                 </span>
                 <span v-else class="text-muted">-</span>
               </td>
             </tr>
             <tr v-if="filteredStudents.length === 0">
-              <td colspan="5" class="empty-state">Aucun étudiant trouvé.</td>
+              <td colspan="5" class="empty-state">
+                <AppEmptyState title="Aucun étudiant" message="Essayez de modifier vos filtres de recherche." />
+              </td>
             </tr>
           </tbody>
         </table>
@@ -88,6 +87,8 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
 import type { StudentProgression } from '@/types';
+import AppLoading from '@/components/common/AppLoading.vue';
+import AppEmptyState from '@/components/common/AppEmptyState.vue';
 
 const router = useRouter();
 
@@ -100,7 +101,7 @@ const searchQuery = ref('');
 onMounted(async () => {
   try {
     const res = await api.getStudentProgression();
-    studentsStats.value = res.data.sort((a: StudentProgression, b: StudentProgression) => 
+    studentsStats.value = res.sort((a: StudentProgression, b: StudentProgression) =>
       a.last_name.localeCompare(b.last_name, 'fr')
     );
   } catch (error) {
@@ -114,10 +115,10 @@ onMounted(async () => {
 const filteredStudents = computed(() => {
   if (!searchQuery.value) return studentsStats.value;
   const q = searchQuery.value.toLowerCase();
-  return studentsStats.value.filter(s => 
-    s.last_name.toLowerCase().includes(q) || 
+  return studentsStats.value.filter(s =>
+    s.last_name.toLowerCase().includes(q) ||
     s.first_name.toLowerCase().includes(q) ||
-    (s.group && s.group.toLowerCase().includes(q))
+    (s.group_name && s.group_name.toLowerCase().includes(q))
   );
 });
 
@@ -147,172 +148,193 @@ const avgProgress = computed(() => {
 </script>
 
 <style scoped>
-.header { 
-  display: flex; 
-  align-items: center; 
-  gap: 15px; margin-bottom: 30px; 
-}
-.header h1 { 
-  font-size: 1.6rem; 
-  color: var(--primary); 
-  margin: 0; 
-}
-.loading { 
-  padding: 40px; 
-  text-align: center; 
-  color: #7f8c8d; 
-  font-size: 1.1rem; 
+.header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 30px;
 }
 
-/* KPIs */
-.kpi-grid { 
-  display: grid; 
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
-  gap: 20px; 
-  margin-bottom: 30px; 
-}
-.kpi-card { 
-  background: white; 
-  padding: 25px; 
-  border-radius: 8px; 
-  border: 1px solid #e1e8ed; 
-  text-align: center; 
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
-}
-.kpi-title { 
-  color: #7f8c8d; 
-  font-size: 0.9rem; 
-  font-weight: 600; 
-  text-transform: uppercase; 
-  margin-bottom: 10px; 
-}
-.kpi-value { 
-  font-size: 2rem; 
-  font-weight: bold; 
-  color: var(--text); 
+.header h1 {
+  font-size: 1.6rem;
+  color: var(--primary);
+  margin: 0;
 }
 
-.text-warning { 
-  color: #e67e22; 
-}
-.text-primary { 
-  color: var(--primary); 
-}
-.text-success { 
-  color: #27ae60; 
-}
-.text-danger { 
-  color: #e74c3c; 
-}
-.text-muted { 
-  color: #bdc3c7; 
-  font-style: italic; 
+.loading {
+  padding: 40px;
+  text-align: center;
+  color: #7f8c8d;
+  font-size: 1.1rem;
 }
 
-/* Tableau. */
-.table-container { 
-  background: white; 
-  border-radius: 8px; 
-  border: 1px solid #e1e8ed; 
-  overflow: hidden; 
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
-}
-.table-header { 
-  padding: 20px; 
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
-  border-bottom: 1px solid #e1e8ed; 
-  background: #fafafa; 
-}
-.table-header h3 { 
-  margin: 0; 
-  color: var(--primary); 
-  font-size: 1.2rem; 
-}
-.search-box input { 
-  padding: 8px 15px; 
-  border: 1px solid #ccc; 
-  border-radius: 20px; 
-  outline: none; 
-  width: 250px; 
-}
-.search-box input:focus { 
-  border-color: var(--accent); 
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
 }
 
-.data-table { 
-  width: 100%; 
-  border-collapse: collapse; 
-  text-align: left; 
-}
-.data-table th { 
-  background: white; 
-  padding: 15px 20px; 
-  font-weight: 600; 
-  color: #7f8c8d; 
-  border-bottom: 2px solid #eee; 
-  font-size: 0.9rem; 
-  text-transform: uppercase; 
-}
-.data-table td { 
-  padding: 15px 20px; 
-  border-bottom: 1px solid #eee; 
-  vertical-align: middle; 
-}
-.data-table tr:hover { 
-  background-color: #f8f9fa; 
+.kpi-card {
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  border: 1px solid #e1e8ed;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
-.badge-group { 
-  background: #ecf0f1; 
-  padding: 4px 10px; 
-  border-radius: 12px; 
-  font-size: 0.85rem; 
-  color: #2c3e50; 
-  font-weight: bold; 
-}
-.badge-progress { 
-  padding: 6px 12px; 
-  border-radius: 20px; 
-  font-weight: bold; 
-  font-size: 0.9rem; 
-  color: white; 
-  display: inline-block; 
-  min-width: 50px; 
-  text-align: center; 
-}
-.bg-success { 
-  background-color: #27ae60; 
-}
-.bg-danger { 
-  background-color: #e74c3c; 
-}
-.bg-neutral { 
-  background-color: #95a5a6; 
+.kpi-title {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 10px;
 }
 
-.empty-state { 
-  text-align: center; 
-  padding: 30px !important; 
-  color: #7f8c8d; 
+.kpi-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--text);
 }
 
-.btn { 
-  padding: 8px 16px; 
-  border-radius: 5px; 
-  cursor: pointer; 
-  font-weight: 500; 
-  transition: 0.2s; 
-  border: none; 
+.text-warning {
+  color: #e67e22;
 }
-.btn-outline { 
-  background: transparent; 
-  border: 1px solid #ccc; 
-  color: var(--text); 
+
+.text-primary {
+  color: var(--primary);
 }
-.btn-outline:hover { 
-  background: #f8f9fa; 
-  border-color: var(--primary); 
+
+.text-success {
+  color: #27ae60;
+}
+
+.text-danger {
+  color: #e74c3c;
+}
+
+.text-muted {
+  color: #bdc3c7;
+  font-style: italic;
+}
+
+.table-container {
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e1e8ed;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.table-header {
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e1e8ed;
+  background: #fafafa;
+}
+
+.table-header h3 {
+  margin: 0;
+  color: var(--primary);
+  font-size: 1.2rem;
+}
+
+.search-box input {
+  padding: 8px 15px;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  outline: none;
+  width: 250px;
+}
+
+.search-box input:focus {
+  border-color: var(--accent);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.data-table th {
+  background: white;
+  padding: 15px 20px;
+  font-weight: 600;
+  color: #7f8c8d;
+  border-bottom: 2px solid #eee;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+}
+
+.data-table td {
+  padding: 15px 20px;
+  border-bottom: 1px solid #eee;
+  vertical-align: middle;
+}
+
+.data-table tr:hover {
+  background-color: #f8f9fa;
+}
+
+.badge-group {
+  background: #ecf0f1;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  color: #2c3e50;
+  font-weight: bold;
+}
+
+.badge-progress {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: white;
+  display: inline-block;
+  min-width: 50px;
+  text-align: center;
+}
+
+.bg-success {
+  background-color: #27ae60;
+}
+
+.bg-danger {
+  background-color: #e74c3c;
+}
+
+.bg-neutral {
+  background-color: #95a5a6;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 30px !important;
+  color: #7f8c8d;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: 0.2s;
+  border: none;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid #ccc;
+  color: var(--text);
+}
+
+.btn-outline:hover {
+  background: #f8f9fa;
+  border-color: var(--primary);
 }
 </style>

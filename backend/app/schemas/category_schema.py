@@ -1,12 +1,16 @@
-from pydantic import BaseModel
 from typing import List, Optional
+
+from pydantic import BaseModel
+
 from app.models import MistakeType
+
 
 class RuleNested(BaseModel):
     id: int
     lt_rule_id: str
     description: str
     is_active: bool
+
 
 class CategoryResponse(BaseModel):
     id: int
@@ -15,6 +19,7 @@ class CategoryResponse(BaseModel):
     type_rousseau: MistakeType
     penalty: float
     rules: List[RuleNested] = []
+
 
 class CategoryUpdate(BaseModel):
     type_rousseau: Optional[MistakeType] = None
