@@ -24,6 +24,18 @@ class StudentResponse(BaseModel):
     declared_level: Optional[str] = None
 
 
+class StudentWithScoresResponse(BaseModel):
+    id: uuid.UUID
+    first_name: str
+    last_name: str
+    promotion_id: Optional[int] = None
+    group_id: Optional[int] = None
+    promotion_name: Optional[str] = None
+    group_name: Optional[str] = None
+    initial_score: Optional[float] = None
+    final_score: Optional[float] = None
+
+
 class StudentProgressionResponse(BaseModel):
     id: uuid.UUID
     first_name: str

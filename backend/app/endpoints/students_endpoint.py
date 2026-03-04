@@ -11,6 +11,7 @@ from app.schemas.student_schema import (
     StudentProgressionResponse,
     StudentResponse,
     StudentUpdate,
+    StudentWithScoresResponse,
 )
 from app.utils.crypto import decrypt_text, encrypt_text
 
@@ -53,6 +54,43 @@ def get_students(session: Session = Depends(get_session)):
                 "parent_2_degree": _get_val(s.parent_2_degree),
                 "parent_2_csp": _get_val(s.parent_2_csp),
                 "declared_level": _get_val(s.declared_level),
+            }
+        )
+
+    return result
+
+@router.get("/with-scores", response_model=List[StudentWithScoresResponse], status_code=status.HTTP_200_OK)
+def get_students_with_scores(session: Session = Depends(get_session)):
+    """Récupère la liste des étudiants avec leurs infos complètes ET leurs scores de dictées."""
+
+    students_db = session.exec(select(Student)).all()
+
+    result = []
+
+    for s in students_db:
+        prenom_clair = decrypt_text(s.first_name_encrypted) or "Inconnu"
+        nom_clair = decrypt_text(s.last_name_encrypted) or "Inconnu"
+
+        score_initial = None
+        score_final = None
+
+        for sub in s.submissions:
+            if sub.assessment_type.name == "INITIAL":
+                score_initial = sub.final_score
+            elif sub.assessment_type.name == "FINAL":
+                score_final = sub.final_score
+
+        result.append(
+            {
+                "id": s.anonymous_id,
+                "first_name": prenom_clair,
+                "last_name": nom_clair,
+                "promotion_id": s.promotion_id,
+                "group_id": s.group_id,
+                "promotion_name": s.promotion.name if s.promotion else None,
+                "group_name": s.group.name if s.group else None,
+                "initial_score": score_initial,
+                "final_score": score_final,
             }
         )
 

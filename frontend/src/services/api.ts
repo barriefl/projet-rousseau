@@ -24,6 +24,7 @@ import type {
   SubmissionCreatePayload,
   Submission,
   SubmissionDetails,
+  StudentWithScores,
 } from '@/types'
 import type { AssessmentType, Platform } from '@/types/generated_enums'
 import { useUiStore } from '@/stores/ui'
@@ -255,6 +256,11 @@ export default {
    */
   async getStudents(): ApiData<Student[]> {
     const response = await apiClient.get<Student[]>('/students/')
+    return response.data
+  },
+
+  async getStudentsWithScores(): ApiData<StudentWithScores[]> {
+    const response = await apiClient.get<StudentWithScores[]>('/students/with-scores')
     return response.data
   },
 

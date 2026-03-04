@@ -14,9 +14,21 @@
     <div class="student-scroll-list" v-else>
       <div v-for="student in filteredStudents" :key="student.id" class="student-card"
         :class="{ 'selected': selectedStudent?.id === student.id }" @click="selectStudent(student)">
-        <h4 style="color: var(--primary); margin: 0 0 5px 0;">{{ student.last_name }} {{ student.first_name }}</h4>
-        <p style="margin: 0; color: #555; font-size: 0.9rem;">{{ student.promotion_name || 'Sans promo' }} - {{
-          student.group_name || 'Sans groupe' }}</p>
+        <div class="student-info">
+          <h4 style="color: var(--primary); margin: 0 0 5px 0;">{{ student.last_name }} {{ student.first_name }}</h4>
+          <p style="margin: 0 0 10px 0; color: #555; font-size: 0.9rem;">
+            ({{ student.promotion_name || 'Sans promo' }}) ({{ student.group_name || 'Sans groupe' }})
+          </p>
+        </div>
+
+        <div class="student-scores">
+          <span class="score-badge" :class="getScoreColorClass(getStudentScore(student, 'Initiale'))">
+            I: {{ formatScore(getStudentScore(student, 'Initiale')) }}
+          </span>
+          <span class="score-badge" :class="getScoreColorClass(getStudentScore(student, 'Finale'))">
+            F: {{ formatScore(getStudentScore(student, 'Finale')) }}
+          </span>
+        </div>
       </div>
     </div>
 
@@ -41,9 +53,8 @@
       </div>
     </div>
 
-    <div v-if="isLoadingDetails" style="text-align: center; padding: 40px; color: #7f8c8d;">
-      ⏳ Analyse du texte et génération de la correction en cours...
-    </div>
+    <AppLoading v-if="isLoadingDetails" message="Analyse du texte et génération de la correction..."
+      style="text-align: center; padding: 40px; color: #7f8c8d;" />
 
     <div v-else-if="submissionDetails" class="atelier-container">
 
@@ -108,19 +119,19 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
-import type { Student, StudentSubmission, SubmissionDetails } from '@/types';
+import type { Student, StudentSubmission, StudentWithScores, SubmissionDetails } from '@/types';
 import AppLoading from '@/components/common/AppLoading.vue';
 
 const router = useRouter();
 
 // --- ÉTATS. ---
-const students = ref<Student[]>([]);
+const students = ref<StudentWithScores[]>([]);
 const searchQuery = ref('');
 const isLoadingStudents = ref(true);
 const isLoadingSubmissions = ref(false);
 const isLoadingDetails = ref(false);
 
-const selectedStudent = ref<Student | null>(null);
+const selectedStudent = ref<StudentWithScores | null>(null);
 const studentSubmissions = ref<StudentSubmission[]>([]);
 const selectedSubmission = ref<StudentSubmission | null>(null);
 const submissionDetails = ref<SubmissionDetails | null>(null);
@@ -144,8 +155,7 @@ const sortedMistakes = computed(() => {
 // --- CHARGEMENT INITIAL. ---
 onMounted(async () => {
   try {
-    const res = await api.getStudents();
-    const data = res;
+    const data = await api.getStudentsWithScores();
     students.value = data.sort((a: Student, b: Student) => a.last_name.localeCompare(b.last_name, 'fr'));
   } catch (error) {
     console.error("Erreur chargement étudiants :", error);
@@ -154,8 +164,27 @@ onMounted(async () => {
   }
 });
 
+// --- LOGIQUE DES BADGES DE SCORE. ---
+const getStudentScore = (student: StudentWithScores, type: 'Initiale' | 'Finale'): number | null => {
+  if (type === 'Initiale' && student.initial_score !== undefined) return student.initial_score;
+  if (type === 'Finale' && student.final_score !== undefined) return student.final_score;
+
+  return null;
+};
+
+const formatScore = (score: number | null) => {
+  return score !== null ? `${score}` : '-';
+};
+
+const getScoreColorClass = (score: number | null) => {
+  if (score === null) return 'badge-empty';
+  if (score <= 5) return 'badge-good';
+  if (score <= 15) return 'badge-medium';
+  return 'badge-bad';
+};
+
 // --- ACTIONS. ---
-const selectStudent = async (student: Student) => {
+const selectStudent = async (student: StudentWithScores) => {
   selectedStudent.value = student;
   selectedSubmission.value = null;
   submissionDetails.value = null;
@@ -280,6 +309,45 @@ const handleMouseOut = (event: MouseEvent) => {
   border: 1px solid #e1e8ed;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.student-scores {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.score-badge {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 700;
+  display: inline-block;
+  min-width: 45px;
+  text-align: center;
+}
+
+.badge-empty {
+  background: #f1f3f5;
+  color: #94a3b8;
+}
+
+.badge-good {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge-medium {
+  background: #fff8c1;
+  color: #9a3412;
+}
+
+.badge-bad {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .student-card:hover {

@@ -130,6 +130,20 @@ export interface Student {
   declared_level?: string | null
 }
 
+export interface StudentWithScores {
+   id: string
+  first_name: string
+  last_name: string
+
+  promotion_id?: number | null
+  group_id?: number | null
+  promotion_name?: string | null
+  group_name?: string | null
+
+  initial_score: number | null
+  final_score: number | null
+}
+
 export interface StudentCreatePayload {
   first_name: string
   last_name: string
