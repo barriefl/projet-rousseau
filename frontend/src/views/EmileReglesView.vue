@@ -26,16 +26,14 @@
       <div class="categories-grid">
         <div v-for="category in categories" :key="category.id" class="category-box">
           <div class="category-header" :data-type="category.type_rousseau">
-            <div style="display: flex; flex-direction: column; gap: 2px;">
-              <span>{{ category.name }}</span>
-              <span style="font-size: 0.75rem; font-family: monospace; font-weight: normal; opacity: 0.8;">
-                {{ category.lt_category_id }}
-              </span>
+            <div class="header-text">
+              <span class="category-name">{{ category.name }}</span>
+              <span class="category-id">{{ category.lt_category_id }}</span>
             </div>
+
             <div class="header-actions">
-              <span class="badge"
-                style="background: #eee; color: #333; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem;">
-                +{{ category.penalty }} pt
+              <span class="badge penalty-badge">
+                +{{ category.penalty }} {{ category.penalty >= 2 ? 'pts' : 'pt' }}
               </span>
               <Pencil :size="18" class="edit-icon-svg" @click="openModal(category)" />
             </div>
@@ -299,8 +297,30 @@ const saveCategory = async () => {
   font-size: 0.95rem;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 15px;
   color: var(--primary);
+}
+
+.header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.category-name {
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.category-id {
+  font-size: 0.75rem;
+  font-family: monospace;
+  font-weight: normal;
+  opacity: 0.8;
+  word-break: break-all;
 }
 
 .category-header[data-type="Dessin"] {
@@ -322,7 +342,18 @@ const saveCategory = async () => {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.penalty-badge {
+  background: #eee;
+  color: #333;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .animate-spin {
