@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
 
-from app.models import AssessmentResult, AssessmentType, Student, Submission
+from app.models import AssessmentResult, AssessmentType, Dictation, Student, Submission
 
 
 class StatsService:
@@ -11,6 +11,17 @@ class StatsService:
         students = self.session.exec(select(Student)).all()
         assessments = self.session.exec(select(AssessmentResult)).all()
 
+        dictation = self.session.exec(select(Dictation)).first()
+        dictation_text = (
+            getattr(dictation, "content_reference", "") if dictation else ""
+        )
+        total_words = len(dictation_text.split()) if dictation_text else 1
+
+        def to_precision(malus: float) -> float:
+            if malus is None:
+                return 0.0
+            return round(max(0.0, ((total_words - malus) / total_words) * 100), 2)
+
         initial_scores = {}
         final_scores = {}
 
@@ -20,17 +31,17 @@ class StatsService:
                     sub.assessment_type == AssessmentType.INITIAL
                     and sub.final_score is not None
                 ):
-                    initial_scores[student.id] = sub.final_score
+                    initial_scores[student.id] = to_precision(sub.final_score)
                 elif (
                     sub.assessment_type == AssessmentType.FINAL
                     and sub.final_score is not None
                 ):
-                    final_scores[student.id] = sub.final_score
+                    final_scores[student.id] = to_precision(sub.final_score)
 
         progressions = {}
         for s in students:
             if s.id in final_scores and s.id in initial_scores:
-                progressions[s.id] = abs(final_scores[s.id] - initial_scores[s.id])
+                progressions[s.id] = round(final_scores[s.id] - initial_scores[s.id], 2)
 
         def safe_avg(scores):
             return round(sum(scores) / len(scores), 2) if scores else 0.0
@@ -48,6 +59,7 @@ class StatsService:
             "dictation_final": [],
             "tools_initial": [],
             "tools_final": [],
+            "effectif": [],
         }
 
         h2_final = {
@@ -56,9 +68,16 @@ class StatsService:
             "g2_progress": [],
             "g5_final": [],
             "g5_progress": [],
+            "effectif": [],
         }
 
         for p_name in promotions:
+            promo_students = [
+                s for s in students if s.promotion and s.promotion.name == p_name
+            ]
+            h1_final["effectif"].append(len(promo_students))
+            h2_final["effectif"].append(len(promo_students))
+
             p_st = [
                 s
                 for s in students
@@ -120,6 +139,11 @@ class StatsService:
             h2_final["g5_progress"].append(safe_avg(g5_p))
 
         # H3
+        total_g4 = len([s for s in students if s.group and s.group.name == "G4"])
+        total_auto = len(
+            [s for s in students if s.group and s.group.name in ["G2", "G3", "G5"]]
+        )
+
         f_g4 = [
             final_scores[s.id]
             for s in students
@@ -147,7 +171,10 @@ class StatsService:
         def add_s(fam, cat, lab, s_id):
             if not lab or lab == "None":
                 lab = "Non renseigné"
-            t = h4_results[fam][cat].setdefault(lab, {"Initial": [], "Progress": []})
+            t = h4_results[fam][cat].setdefault(lab, {"Initial": [], "Progress": [], "Effectif": 0})
+
+            t["Effectif"] += 1
+
             if s_id in initial_scores:
                 t["Initial"].append(initial_scores[s_id])
             if s_id in progressions:
@@ -205,9 +232,10 @@ class StatsService:
                     items.sort(key=lambda x: safe_avg(x[1]["Progress"]), reverse=True)
 
                 h4_final[family][cat] = {
-                    label: {
-                        "Initial": safe_avg(v["Initial"]),
-                        "Progress": safe_avg(v["Progress"]),
+                    str(label): {
+                        "Initial": float(safe_avg(v["Initial"])),
+                        "Progress": float(safe_avg(v["Progress"])),
+                        "Effectif": int(v["Effectif"]),
                     }
                     for label, v in items
                 }
@@ -216,8 +244,14 @@ class StatsService:
             "h1_summary": h1_final,
             "h2_equivalence": h2_final,
             "h3_teacher": {
-                "Accompagnement Humain (G4)": safe_avg(f_g4),
-                "Autonomie / Outils (G2/G3/G5)": safe_avg(f_auto),
+                "Accompagnement Humain (G4)": {
+                    "score": safe_avg(f_g4),
+                    "effectif": total_g4,
+                },
+                "Autonomie / Outils (G2/G3/G5)": {
+                    "score": safe_avg(f_auto),
+                    "effectif": total_auto,
+                },
             },
             "h4_sociocultural": h4_final,
         }

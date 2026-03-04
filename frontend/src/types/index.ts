@@ -201,7 +201,7 @@ export interface SubmissionDetails {
     position_index: number
     length: number
     category_id: number | null
-    type_rousseau: 'D' | 'S' | 'R' | 'A'
+    type_rousseau: MistakeType
     malus_applied: number
     rule_id_lt: string
     message: string
@@ -251,6 +251,7 @@ export interface H1Summary {
   dictation_final: number[]
   tools_initial: number[]
   tools_final: number[]
+  effectif: number[]
 }
 
 export interface H2Equivalence {
@@ -259,19 +260,37 @@ export interface H2Equivalence {
   g2_progress: number[]
   g5_final: number[]
   g5_progress: number[]
+  effectif: number[]
+}
+
+export interface TeacherStat {
+  score: number
+  effectif: number
 }
 
 export interface H4DataPoint {
   Initial: number
   Progress: number
+  Effectif: number
 }
 
 export interface RousseauStats {
   h1_summary: H1Summary
   h2_equivalence: H2Equivalence
-  h3_teacher: Record<string, number>
+  h3_teacher: Record<string, TeacherStat>
   h4_sociocultural: Record<string, Record<string, Record<string, H4DataPoint>>>
 }
+
+export interface CustomDataset {
+  effectifData?: number[];
+  useScaling?: boolean;
+  maxEffectif?: number;
+};
+
+export interface CustomBarElement {
+  _originalHeight?: number;
+  height: number;
+};
 
 // --- TYPES POUR LES DICTÉES RÉFÉRENTES. ---
 export interface DictationCreatePayload {
@@ -304,12 +323,4 @@ export interface ImportSummary {
   created: number
   updated: number
   message?: string
-}
-
-// --- A CHECK. ---
-export interface StudentCreate {
-  first_name: string
-  last_name: string
-  promo?: string
-  group?: string
 }

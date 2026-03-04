@@ -4,10 +4,14 @@ from pydantic import BaseModel
 
 
 # Dashboard Étude Rousseau.
+class TeacherStat(BaseModel):
+    score: float
+    effectif: int
+
 class RousseauStatsResponse(BaseModel):
     h1_summary: Dict[str, Any]
     h2_equivalence: Dict[str, Any]
-    h3_teacher: Dict[str, float]
+    h3_teacher: Dict[str, TeacherStat]
     h4_sociocultural: Dict[str, Any]
 
     class Config:
