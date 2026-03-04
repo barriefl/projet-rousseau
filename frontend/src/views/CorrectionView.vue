@@ -22,11 +22,11 @@
         </div>
 
         <div class="student-scores">
-          <span class="score-badge" :class="getScoreColorClass(getStudentScore(student, 'Initiale'))">
-            I: {{ formatScore(getStudentScore(student, 'Initiale')) }}
+          <span class="score-badge" :class="getScoreColorClass(student.initial_score, 'initial')">
+            I: {{ formatScore(student.initial_score) }}
           </span>
-          <span class="score-badge" :class="getScoreColorClass(getStudentScore(student, 'Finale'))">
-            F: {{ formatScore(getStudentScore(student, 'Finale')) }}
+          <span class="score-badge" :class="getScoreColorClass(student.final_score, 'final')">
+            F: {{ formatScore(student.final_score) }}
           </span>
         </div>
       </div>
@@ -165,21 +165,51 @@ onMounted(async () => {
 });
 
 // --- LOGIQUE DES BADGES DE SCORE. ---
-const getStudentScore = (student: StudentWithScores, type: 'Initiale' | 'Finale'): number | null => {
-  if (type === 'Initiale' && student.initial_score !== undefined) return student.initial_score;
-  if (type === 'Finale' && student.final_score !== undefined) return student.final_score;
-
-  return null;
-};
-
 const formatScore = (score: number | null) => {
   return score !== null ? `${score}` : '-';
 };
 
-const getScoreColorClass = (score: number | null) => {
-  if (score === null) return 'badge-empty';
-  if (score <= 5) return 'badge-good';
-  if (score <= 15) return 'badge-medium';
+// --- CALCUL DYNAMIQUE DES QUARTILES. ---
+const scoreThresholds = computed(() => {
+  const getQuartiles = (type: 'initial_score' | 'final_score') => {
+    const scores = students.value
+      .map(s => s[type])
+      .filter((score): score is number => score !== null && score !== undefined);
+
+    if (scores.length === 0) return { q1: 5, q3: 15 };
+    if (scores.length === 1) return { q1: scores[0], q3: scores[0] };
+
+    scores.sort((a, b) => a - b);
+
+    const q1Index = Math.floor((scores.length - 1) * 0.25);
+    const q3Index = Math.floor((scores.length - 1) * 0.75);
+
+    return {
+      q1: scores[q1Index],
+      q3: scores[q3Index]
+    };
+  };
+
+  return {
+    initial: getQuartiles('initial_score'),
+    final: getQuartiles('final_score')
+  };
+});
+
+const getScoreColorClass = (score: number | null | undefined, type: 'initial' | 'final') => {
+  if (score === null || score === undefined) return 'badge-empty';
+
+  const thresholds = scoreThresholds.value[type];
+
+  if (!thresholds || thresholds.q1 === undefined || thresholds.q3 === undefined) {
+    if (score <= 5) return 'badge-good';
+    if (score <= 15) return 'badge-medium';
+    return 'badge-bad';
+  }
+
+  if (score <= thresholds.q1) return 'badge-good';
+  if (score <= thresholds.q3) return 'badge-medium';
+
   return 'badge-bad';
 };
 
@@ -193,7 +223,15 @@ const selectStudent = async (student: StudentWithScores) => {
 
   try {
     const res = await api.getStudentSubmissions(student.id);
-    studentSubmissions.value = res;
+
+    studentSubmissions.value = res.sort((a, b) => {
+      const typeA = a.assessment_type?.toUpperCase() || '';
+      const typeB = b.assessment_type?.toUpperCase() || '';
+
+      if (typeA.includes('INITIAL')) return -1;
+      if (typeB.includes('INITIAL')) return 1;
+      return 0;
+    });
   } catch (error) {
     console.error("Erreur dictées :", error);
   } finally {

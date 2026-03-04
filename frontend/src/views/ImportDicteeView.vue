@@ -44,13 +44,13 @@
           <label>Fichiers étudiants (.txt) :</label>
           <div class="upload-zone" @click="triggerFileInput" @dragover.prevent="dragOver = true"
             @dragleave.prevent="dragOver = false" @drop.prevent="handleDrop"
-            :class="{ 'drag-over': dragOver, 'disabled': !selectedPromotion }">
+            :class="{ 'drag-over': dragOver, 'disabled': !canUpload }">
             <FileText :size="48" class="upload-icon" />
-            <h3 v-if="selectedPromotion">Cliquez ou glissez-déposez vos fichiers .txt ici</h3>
-            <h3 v-else style="color: var(--danger);">Veuillez sélectionner une promotion d'abord</h3>
-            <p>Le format conseillé du nom de fichier est "NOM_Prenom_*.txt"</p>
-            <input type="file" ref="fileInputRef" style="display: none;" accept=".txt" multiple
-              :disabled="!selectedPromotion" @change="handleFileUpload">
+            <h3 v-if="selectedPromotion">Cliquez ou glissez-déposez vos fichiers .txt ici.</h3>
+            <h3 v-else style="color: var(--danger);">Veuillez sélectionner une promotion et une dictée d'abord.</h3>
+            <p>Le format conseillé du nom de fichier est "NOM_Prenom_*.txt".</p>
+            <input type="file" ref="fileInputRef" style="display: none;" accept=".txt" multiple :disabled="!canUpload"
+              @change="handleFileUpload">
           </div>
         </div>
 
@@ -68,8 +68,17 @@
             </div>
 
             <div v-if="fileItem.status === 'MATCHED' || fileItem.status === 'CONFIRMED'" class="file-action success">
-              <CheckCircle :size="18" />
-              <span>Associé à <strong>{{ getStudentName(fileItem.studentId) }}</strong></span>
+              <div class="action-content">
+                <div class="match-info">
+                  <CheckCircle :size="18" />
+                  <span>Associé à <strong>{{ getStudentName(fileItem.studentId) }}</strong></span>
+                </div>
+                <div v-if="willOverwrite(fileItem.studentId)" class="overwrite-warning">
+                  <AlertTriangle :size="14" />
+                  <span>Attention : remplacera la dictée {{ submissionType.toLowerCase() }} existante.</span>
+                </div>
+              </div>
+
               <button class="btn btn-sm btn-outline btn-with-icon" style="margin-left: auto;"
                 @click="openCreateStudentForm(fileItem)">
                 <UserPlus :size="14" /> <span>Créer un autre étudiant</span>
@@ -107,10 +116,11 @@
         </div>
 
         <div class="actions" v-if="parsedFiles.length > 0">
-          <p v-if="!canSubmit && !isSubmitting" class="warning-text title-with-icon" style="margin-right: 15px;">
+          <div v-if="!canSubmit && !isSubmitting" class="warning-text title-with-icon">
             <AlertTriangle :size="18" />
             <span>Traitez les fichiers en jaune et rouge avant de valider.</span>
-          </p>
+          </div>
+
           <button v-if="!isSubmitting" class="btn btn-primary btn-large btn-with-icon" @click="submitAll"
             :disabled="isSubmitting || !canSubmit">
             <Loader2 v-if="isSubmitting" :size="20" class="animate-spin" />
@@ -133,23 +143,16 @@
     </div>
   </div>
 
-  <StudentFormModal
-    :show="showCreateModal"
-    :student-data="(newStudentForm as Student)"
-    :promotions="promotions"
-    :groups="groups"
-    :is-edit="false"
-    :lock-promotion-id="selectedPromotion === '' ? null : selectedPromotion"
-    @close="showCreateModal = false"
-    @save="handleCreateStudent"
-  />
+  <StudentFormModal :show="showCreateModal" :student-data="(newStudentForm as Student)" :promotions="promotions"
+    :groups="groups" :is-edit="false" :lock-promotion-id="selectedPromotion === '' ? null : selectedPromotion"
+    @close="showCreateModal = false" @save="handleCreateStudent" />
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
-import type { Student, Dictation, Promotion, Group, StudentCreatePayload } from '@/types';
+import type { Student, Dictation, Promotion, Group, StudentCreatePayload, StudentWithScores } from '@/types';
 import { AssessmentType } from '@/types/generated_enums';
 import AppLoading from '@/components/common/AppLoading.vue';
 import {
@@ -183,7 +186,7 @@ interface ParsedFile {
   parsedName: string;
   status: FileStatus;
   studentId: string | null;
-  suggestedStudent: Student | null;
+  suggestedStudent: StudentWithScores | null;
 }
 
 // --- ÉTATS. ---
@@ -191,7 +194,7 @@ const isLoading = ref(true);
 const isSubmitting = ref(false);
 const dragOver = ref(false);
 
-const students = ref<Student[]>([]);
+const students = ref<StudentWithScores[]>([]);
 const dictations = ref<Dictation[]>([]);
 const promotions = ref<Promotion[]>([]);
 const groups = ref<Group[]>([]);
@@ -222,7 +225,7 @@ const newStudentForm = ref<Partial<Student>>({
 onMounted(async () => {
   try {
     const [studentsRes, dictationsRes, promoRes, groupRes] = await Promise.all([
-      api.getStudents(),
+      api.getStudentsWithScores(),
       api.getDictations(),
       api.getPromotions(),
       api.getGroups()
@@ -238,6 +241,26 @@ onMounted(async () => {
     isLoading.value = false;
   }
 });
+
+// --- PROPRIÉTÉ CALCULÉE POUR L'UPLOAD. ---
+const canUpload = computed(() => {
+  return selectedPromotion.value !== '' && selectedDictation.value !== '';
+});
+
+// --- VÉRIFICATION D'ÉCRASEMENT. ---
+const willOverwrite = (studentId: string | null) => {
+  if (!studentId) return false;
+  const student = students.value.find(s => s.id === studentId);
+  if (!student) return false;
+
+  if (submissionType.value === AssessmentType.INITIAL && student.initial_score !== null && student.initial_score !== undefined) {
+    return true;
+  }
+  if (submissionType.value === AssessmentType.FINAL && student.final_score !== null && student.final_score !== undefined) {
+    return true;
+  }
+  return false;
+};
 
 // --- UTILITAIRES. ---
 const normalizeText = (text: string) => {
@@ -274,8 +297,8 @@ const handlePromotionChange = () => {
 };
 
 const triggerFileInput = () => {
-  if (!selectedPromotion.value) {
-    ui.notify("Veuillez sélectionner une promotion d'abord.", "error");
+  if (!canUpload.value) {
+    ui.notify("Veuillez sélectionner une promotion et une dictée d'abord.", "error");
     return;
   }
   if (fileInputRef.value) fileInputRef.value.click();
@@ -283,8 +306,8 @@ const triggerFileInput = () => {
 
 const handleDrop = (e: DragEvent) => {
   dragOver.value = false;
-  if (!selectedPromotion.value) {
-    ui.notify("Veuillez sélectionner une promotion d'abord.", "error");
+  if (!canUpload.value) {
+    ui.notify("Veuillez sélectionner une promotion et une dictée d'abord.", "error");
     return;
   }
   if (e.dataTransfer?.files) processFiles(Array.from(e.dataTransfer.files));
@@ -327,7 +350,7 @@ const findMatchForFile = (fileItem: ParsedFile) => {
 
   const studentsInPromo = students.value.filter(s => s.promotion_id === selectedPromotion.value);
 
-  let bestMatch: Student | null = null;
+  let bestMatch: StudentWithScores | null = null;
   let minDistance = Infinity;
 
   for (const student of studentsInPromo) {
@@ -384,7 +407,7 @@ const openCreateStudentForm = (fileItem: ParsedFile) => {
   editingFileItem.value = fileItem;
 
   const parts = fileItem.parsedName?.split(' ') || [];
-  
+
   newStudentForm.value = {
     last_name: parts[0]?.toUpperCase() || '',
     first_name: parts.slice(1).join(' ') || '',
@@ -398,7 +421,7 @@ const openCreateStudentForm = (fileItem: ParsedFile) => {
 const handleCreateStudent = async (payload: StudentCreatePayload) => {
   try {
     const newStudent = await api.createStudent(payload);
-    
+
     if (editingFileItem.value) {
       editingFileItem.value.status = 'CONFIRMED';
       editingFileItem.value.studentId = newStudent.id;
@@ -449,7 +472,7 @@ const submitAll = async () => {
       const chunk = filesToProcess.slice(i, i + CHUNK_SIZE);
 
       const payload = chunk.map(f => ({
-        student_id: f.studentId as string,
+        student_uuid: f.studentId as string,
         dictation_id: Number(selectedDictation.value),
         assessment_type: submissionType.value,
         content_student: f.content
@@ -683,11 +706,6 @@ const submitAll = async () => {
   font-size: 0.85rem;
 }
 
-.btn-large {
-  padding: 12px 24px;
-  font-size: 1.1rem;
-}
-
 .btn-primary {
   background: var(--accent);
   color: white;
@@ -723,16 +741,47 @@ const submitAll = async () => {
 
 .actions {
   display: flex;
-  justify-content: flex-end;
-  align-items: center;
+  flex-direction: column;
+  gap: 15px;
   margin-top: 25px;
   border-top: 2px solid #f0f2f5;
   padding-top: 20px;
 }
 
+.actions .warning-text {
+  align-self: flex-start;
+  margin: 0;
+}
+
 .warning-text {
   color: #e67e22;
   font-weight: bold;
+}
+
+/* Overwrite. */
+.action-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.match-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.overwrite-warning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #d35400;
+  background: #fdfae7;
+  padding: 4px 10px;
+  border-radius: 4px;
+  margin-left: 28px;
+  border: 1px dashed #fde68a;
 }
 
 /* Icône dans la zone d'upload */
@@ -797,9 +846,9 @@ const submitAll = async () => {
   padding: 15px 30px;
   font-size: 1.1rem;
   width: 100%;
-  /* Optionnel : pour qu'il prenne toute la largeur en bas de page */
-  margin-top: 20px;
   box-shadow: 0 4px 6px rgba(26, 188, 156, 0.2);
+  display: flex;
+  justify-content: center;
 }
 
 .btn-large:hover:not(:disabled) {
@@ -807,49 +856,56 @@ const submitAll = async () => {
   box-shadow: 0 6px 12px rgba(26, 188, 156, 0.3);
 }
 
-/* Animation de rotation pour le loader */
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
+/* --- BARRE DE PROGRESSION--- */
 .progress-container {
   width: 100%;
-  max-width: 400px;
-  text-align: right;
+  margin-top: 15px;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  gap: 12px;
 }
 
 .progress-text {
-  font-weight: bold;
+  font-weight: 600;
   color: var(--primary);
-  margin-bottom: 8px;
-  font-size: 0.95rem;
+  font-size: 1rem;
+  text-align: center;
 }
 
 .progress-bar {
   width: 100%;
-  height: 12px;
-  background-color: #ecf0f1;
-  border-radius: 10px;
+  height: 24px;
+  background-color: #edf2f7;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .progress-fill {
   height: 100%;
   background-color: var(--accent);
+  background-image: linear-gradient(45deg,
+      rgba(255, 255, 255, 0.15) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.15) 50%,
+      rgba(255, 255, 255, 0.15) 75%,
+      transparent 75%,
+      transparent);
+  background-size: 1rem 1rem;
+  border-radius: 12px;
   transition: width 0.4s ease-out;
+  animation: progress-stripes 1s linear infinite;
+  box-shadow: 0 2px 5px rgba(26, 188, 156, 0.4);
+}
+
+@keyframes progress-stripes {
+  from {
+    background-position: 1rem 0;
+  }
+
+  to {
+    background-position: 0 0;
+  }
 }
 </style>

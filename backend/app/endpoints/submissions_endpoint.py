@@ -115,23 +115,45 @@ def create_bulk_submissions(
         if not student_id:
             continue
 
-        new_submission = Submission(
-            student_id=student_id,
-            dictation_id=sub_in.dictation_id,
-            content_student=sub_in.content_student,
-            assessment_type=sub_in.assessment_type,
-            final_score=0.0,
-            scores={},
+        statement = select(Submission).where(
+            Submission.student_id == student_id,
+            Submission.dictation_id == sub_in.dictation_id,
+            Submission.assessment_type == sub_in.assessment_type,
         )
-        session.add(new_submission)
+        existing_sub = session.exec(statement).first()
+
+        if existing_sub:
+            existing_sub.content_student = sub_in.content_student
+            existing_sub.final_score = 0.0
+            existing_sub.scores = {}
+            if hasattr(existing_sub, "html_text"):
+                existing_sub.html_text = None
+
+            if hasattr(existing_sub, "mistakes"):
+                for mistake in existing_sub.mistakes:
+                    session.delete(mistake)
+
+            session.add(existing_sub)
+            target_submission = existing_sub
+        else:
+            target_submission = Submission(
+                student_id=student_id,
+                dictation_id=sub_in.dictation_id,
+                content_student=sub_in.content_student,
+                assessment_type=sub_in.assessment_type,
+                final_score=0.0,
+                scores={},
+            )
+            session.add(target_submission)
+
         session.flush()
 
         try:
-            correction_service.correct_submission(new_submission)
+            correction_service.correct_submission(target_submission)
         except Exception as e:
             print(f"⚠️ Erreur de correction pour l'étudiant ID {student_id}: {e}")
 
-        created_submissions.append((new_submission, sub_in.student_uuid))
+        created_submissions.append((target_submission, sub_in.student_uuid))
 
     session.commit()
 

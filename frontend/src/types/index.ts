@@ -320,7 +320,7 @@ export interface Dictation {
 
 // --- TYPES POUR LES DICTÉES. ---
 export interface SubmissionCreatePayload {
-  student_id: string
+  student_uuid: string
   dictation_id: number
   assessment_type: AssessmentType
   content_student: string
