@@ -375,6 +375,10 @@ export default {
     const response = await apiClient.get<RousseauStats>('/stats/rousseau')
     return response.data
   },
+  async getEmileDashboardStats() {
+    const response = await apiClient.get('/stats/emile')
+    return response.data
+  },
 
   // --- DICTÉE RÉFÉRENTE. ---
   /**
@@ -418,10 +422,5 @@ export default {
   async createBulkSubmissions(submissions: SubmissionCreatePayload[]): ApiData<Submission[]> {
     const response = await apiClient.post<Submission[]>('/submissions/bulk', submissions)
     return response.data
-  },
-
-  // AUTRE.
-  getEmileDashboardStats() {
-    return apiClient.get('/stats/emile')
   },
 }

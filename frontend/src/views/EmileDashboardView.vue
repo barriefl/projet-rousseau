@@ -1,43 +1,52 @@
 <template>
   <div class="emile-dashboard">
     <div class="header">
-      <h1>📊 Tableau de Bord É.M.I.L.E.</h1>
-    </div>
-    
-    <div v-if="isLoading" class="loading">
-      ⏳ Récupération des statistiques analytiques...
+      <LayoutDashboard :size="28" class="header-icon" />
+      <h1>Tableau de Bord É.M.I.L.E.</h1>
     </div>
 
-    <div v-else-if="stats">
+    <AppLoading v-if="isLoading" message="Récupération des statistiques analytiques..." />
+
+    <AppEmptyState v-else-if="!stats" title="Aucune donnée statistique"
+      message="Impossible de charger les données du tableau de bord." action-label="Réessayer" @action="fetchStats" />
+
+    <div v-else>
       <div class="grid-3">
         <div class="card">
           <h3>Total Étudiants</h3>
           <div class="stat-val">{{ stats.total_students }}</div>
           <div class="stat-desc">Ayant passé au moins une dictée</div>
         </div>
-        
+
         <div class="card">
           <h3>Dictées Traitées</h3>
           <div class="stat-val">{{ stats.total_submissions }}</div>
           <div class="stat-desc">Analysées par É.M.I.L.E.</div>
         </div>
-        
+
         <div class="card">
           <h3>Moyenne Globale (Malus)</h3>
           <div class="stat-val danger">{{ stats.global_average }} pts</div>
           <div class="stat-desc">Moyenne de toutes les copies</div>
         </div>
       </div>
-      
+
       <h2 class="section-title">Analyse par Groupe</h2>
       <div class="grid-2">
         <div class="card chart-container">
-          <h3>Répartition des étudiants</h3>
+          <div class="card-header-flex">
+            <h3>Répartition des étudiants</h3>
+            <select v-model="selectedPromoDist" class="select-filter">
+              <option v-for="promo in availablePromos" :key="promo" :value="promo">
+                {{ promo }}
+              </option>
+            </select>
+          </div>
           <div class="chart-wrapper">
-            <Pie :data="distributionChartData" :options="pieOptions" />
+            <Bar :data="distributionChartData" :options="barOptions" />
           </div>
         </div>
-        
+
         <div class="card chart-container">
           <h3>Moyenne (Malus) par Groupe</h3>
           <div class="chart-wrapper">
@@ -56,10 +65,26 @@
         </div>
 
         <div class="card chart-container">
-          <h3>Impact de la méthode de travail</h3>
+          <h3>Progrès par méthode de travail</h3>
           <div class="chart-wrapper">
             <Bar :data="motivationChartData" :options="barOptions" />
           </div>
+        </div>
+      </div>
+
+      <h2 class="section-title">Analyse des Erreurs</h2>
+      <div class="card chart-container" style="margin-bottom: 20px;">
+        <div class="card-header-flex">
+          <h3>Fautes les plus fréquentes (par Typologie et Catégorie)</h3>
+          <select v-model="selectedMistakeFilter" class="select-filter">
+            <option value="global">Vue Globale (Toutes promos)</option>
+            <option v-for="promo in availablePromos" :key="'mistake-' + promo" :value="promo">
+              Promotion {{ promo }}
+            </option>
+          </select>
+        </div>
+        <div class="chart-wrapper" style="height: 350px;">
+          <Bar :data="mistakesChartData" :options="stackedBarOptions" />
         </div>
       </div>
 
@@ -79,7 +104,6 @@
           </div>
         </div>
       </div>
-
     </div>
   </div>
 </template>
@@ -88,219 +112,384 @@
 import { ref, onMounted, computed } from 'vue';
 import api from '@/services/api';
 
-// --- IMPORT CHART.JS. ---
+import AppLoading from '@/components/common/AppLoading.vue';
+import AppEmptyState from '@/components/common/AppEmptyState.vue';
+import { LayoutDashboard } from 'lucide-vue-next';
+import type { EmileStatsResponse } from '@/types';
+
 import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement } from 'chart.js';
-import { Bar, Pie } from 'vue-chartjs';
+import { Bar } from 'vue-chartjs';
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement);
 
-// --- ÉTATS. ---
 const isLoading = ref(true);
-const stats = ref<any>(null);
+const stats = ref<EmileStatsResponse | null>(null);
 
-// --- CHARGEMENT. ---
-onMounted(async () => {
+const selectedPromoDist = ref<string>('');
+const selectedMistakeFilter = ref<string>('global');
+
+const fetchStats = async () => {
+  isLoading.value = true;
   try {
     const res = await api.getEmileDashboardStats();
-    stats.value = res.data;
+    stats.value = res;
+
+    if (stats.value?.group_distribution_by_promo) {
+      const promos = Object.keys(stats.value.group_distribution_by_promo);
+      if (promos.length > 0) {
+        selectedPromoDist.value = promos[0] || '';
+      }
+    }
   } catch (error) {
     console.error("Erreur lors du chargement du tableau de bord :", error);
   } finally {
     isLoading.value = false;
   }
+};
+
+onMounted(() => {
+  fetchStats();
 });
 
-// --- DATA POUR LES GRAPHIQUES. ---
+// Liste de toutes les promos pour les selects
+const availablePromos = computed(() => {
+  return stats.value?.group_distribution_by_promo ? Object.keys(stats.value.group_distribution_by_promo) : [];
+});
 
-// 1. Répartition par groupe (Camembert).
+// --- DATA POUR LES GRAPHIQUES ---
+
+// 1. Répartition par groupe (Désormais un Bar Chart filtré par Promo)
 const distributionChartData = computed(() => {
-  if (!stats.value?.group_distribution) return { labels: [], datasets: [] };
+  const currentStats = stats.value;
+  if (!currentStats?.group_distribution_by_promo || !selectedPromoDist.value) return { labels: [], datasets: [] };
+
+  const promoData = currentStats.group_distribution_by_promo[selectedPromoDist.value] || {};
+
   return {
-    labels: Object.keys(stats.value.group_distribution),
+    labels: Object.keys(promoData),
     datasets: [{
-      label: 'Étudiants',
-      data: Object.values(stats.value.group_distribution) as number[],
-      backgroundColor: ['#3498db', '#e74c3c', '#f1c40f', '#2ecc71', '#9b59b6', '#e67e22', '#1abc9c'],
-      borderWidth: 1
+      label: `Étudiants (${selectedPromoDist.value})`,
+      data: Object.values(promoData),
+      backgroundColor: '#3498db',
+      borderRadius: 4
     }]
   };
 });
 
-// 2. Moyennes par groupe (Double Barre).
+// 2. Moyennes par groupe
 const averagesChartData = computed(() => {
-  if (!stats.value?.group_averages) return { labels: [], datasets: [] };
-  const labels = Object.keys(stats.value.group_averages);
+  const currentStats = stats.value;
+  if (!currentStats?.group_averages) return { labels: [], datasets: [] };
+  const labels = Object.keys(currentStats.group_averages);
   return {
     labels: labels,
     datasets: [
-      { label: 'Score Initial', data: labels.map(l => stats.value.group_averages[l].Initial), backgroundColor: '#e74c3c', borderRadius: 4 },
-      { label: 'Score Final', data: labels.map(l => stats.value.group_averages[l].Final), backgroundColor: '#3498db', borderRadius: 4 }
+      { label: 'Score Initial', data: labels.map(l => currentStats.group_averages[l]?.Initial ?? 0), backgroundColor: '#e74c3c', borderRadius: 4 },
+      { label: 'Score Final', data: labels.map(l => currentStats.group_averages[l]?.Final ?? 0), backgroundColor: '#3498db', borderRadius: 4 }
     ]
   };
 });
 
-// 3. Moyennes par Promo (Double Barre).
+// 3. Moyennes par Promo
 const promoChartData = computed(() => {
-  if (!stats.value?.promo_averages) return { labels: [], datasets: [] };
-  const labels = Object.keys(stats.value.promo_averages);
+  const currentStats = stats.value;
+  if (!currentStats?.promo_averages) return { labels: [], datasets: [] };
+  const labels = Object.keys(currentStats.promo_averages);
   return {
     labels: labels,
     datasets: [
-      { label: 'Score Initial', data: labels.map(l => stats.value.promo_averages[l].Initial), backgroundColor: '#e74c3c', borderRadius: 4 },
-      { label: 'Score Final', data: labels.map(l => stats.value.promo_averages[l].Final), backgroundColor: '#9b59b6', borderRadius: 4 }
+      { label: 'Score Initial', data: labels.map(l => currentStats.promo_averages[l]?.Initial ?? 0), backgroundColor: '#e74c3c', borderRadius: 4 },
+      { label: 'Score Final', data: labels.map(l => currentStats.promo_averages[l]?.Final ?? 0), backgroundColor: '#9b59b6', borderRadius: 4 }
     ]
   };
 });
 
-// 4. Motivation (Double Barre).
+// 4. Motivation
 const motivationChartData = computed(() => {
-  if (!stats.value?.comparison_motivation) return { labels: [], datasets: [] };
-  const labels = Object.keys(stats.value.comparison_motivation);
+  const currentStats = stats.value;
+  if (!currentStats?.comparison_motivation) return { labels: [], datasets: [] };
+  const labels = Object.keys(currentStats.comparison_motivation);
   return {
     labels: labels,
-    datasets: [
-      { label: 'Score Initial', data: labels.map(l => stats.value.comparison_motivation[l].Initial), backgroundColor: '#e74c3c', borderRadius: 4 },
-      { label: 'Score Final', data: labels.map(l => stats.value.comparison_motivation[l].Final), backgroundColor: '#f39c12', borderRadius: 4 }
-    ]
+    datasets: [{
+      label: 'Progrès',
+      data: labels.map(l => currentStats.comparison_motivation[l] ?? 0),
+      backgroundColor: '#2ecc71',
+      borderRadius: 4
+    }]
   };
 });
 
-// 5. Outils (Double Barre Horizontale).
+// 5. Graphique Empilé des Fautes.
+const mistakesChartData = computed(() => {
+  const currentStats = stats.value;
+  if (!currentStats?.mistakes_stats) return { labels: [], datasets: [] };
+
+  const sourceData = selectedMistakeFilter.value === 'global'
+    ? currentStats.mistakes_stats.global
+    : (currentStats.mistakes_stats.promotions[selectedMistakeFilter.value] || {});
+
+  const typologies = Object.keys(sourceData);
+  const datasetsMap: Record<string, number[]> = {};
+
+  typologies.forEach((typo, typoIndex) => {
+    const categories = sourceData[typo] || {};
+    for (const [catName, count] of Object.entries(categories)) {
+      if (!datasetsMap[catName]) {
+        datasetsMap[catName] = new Array(typologies.length).fill(0);
+      }
+      datasetsMap[catName][typoIndex] = count;
+    }
+  });
+
+  const colors = ['#e74c3c', '#3498db', '#f1c40f', '#2ecc71', '#9b59b6', '#e67e22', '#1abc9c', '#34495e', '#7f8c8d', '#d35400'];
+
+  const datasets = Object.keys(datasetsMap).map((catName, index) => ({
+    label: catName,
+    data: datasetsMap[catName] ?? [],
+    backgroundColor: colors[index % colors.length] ?? '#34495e'
+  }));
+
+  return {
+    labels: typologies,
+    datasets
+  };
+});
+
+// 6 & 7. Outils & Humain vs Robot
 const toolChartData = computed(() => {
-  if (!stats.value?.comparison_tool) return { labels: [], datasets: [] };
-  const labels = Object.keys(stats.value.comparison_tool);
+  const currentStats = stats.value;
+  if (!currentStats?.comparison_tool) return { labels: [], datasets: [] };
+  const labels = Object.keys(currentStats.comparison_tool);
   return {
     labels: labels,
     datasets: [
-      { label: 'Score Initial', data: labels.map(l => stats.value.comparison_tool[l].Initial), backgroundColor: '#e74c3c', borderRadius: 4 },
-      { label: 'Score Final', data: labels.map(l => stats.value.comparison_tool[l].Final), backgroundColor: '#2ecc71', borderRadius: 4 }
+      { label: 'Score Initial', data: labels.map(l => currentStats.comparison_tool[l]?.Initial ?? 0), backgroundColor: '#e74c3c', borderRadius: 4 },
+      { label: 'Score Final', data: labels.map(l => currentStats.comparison_tool[l]?.Final ?? 0), backgroundColor: '#2ecc71', borderRadius: 4 }
     ]
   };
 });
 
-// 6. Humain vs Robot (Double Barre Horizontale).
 const humanRobotChartData = computed(() => {
-  if (!stats.value?.comparison_human_robot) return { labels: [], datasets: [] };
-  const labels = Object.keys(stats.value.comparison_human_robot);
+  const currentStats = stats.value;
+  if (!currentStats?.comparison_human_robot) return { labels: [], datasets: [] };
+  const labels = Object.keys(currentStats.comparison_human_robot);
   return {
     labels: labels,
     datasets: [
-      { label: 'Score Initial', data: labels.map(l => stats.value.comparison_human_robot[l].Initial), backgroundColor: '#e74c3c', borderRadius: 4 },
-      { label: 'Score Final', data: labels.map(l => stats.value.comparison_human_robot[l].Final), backgroundColor: '#34495e', borderRadius: 4 }
+      { label: 'Score Initial', data: labels.map(l => currentStats.comparison_human_robot[l]?.Initial ?? 0), backgroundColor: '#e74c3c', borderRadius: 4 },
+      { label: 'Score Final', data: labels.map(l => currentStats.comparison_human_robot[l]?.Final ?? 0), backgroundColor: '#34495e', borderRadius: 4 }
     ]
   };
 });
 
-// --- OPTIONS DES GRAPHIQUES. ---
-const pieOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { position: 'bottom' as const } }
-};
+// --- OPTIONS DES GRAPHIQUES ---
 
 const barOptions = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: { legend: { display: true, position: 'bottom' as const } },
-  scales: { y: { beginAtZero: true, title: { display: true, text: 'Points de Malus' } } }
+  scales: { y: { beginAtZero: true, title: { display: true, text: 'Points' } } }
 };
 
-// Options pour graphiques en barres horizontales.
 const horizontalBarOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  indexAxis: 'y' as const, 
+  indexAxis: 'y' as const,
   plugins: { legend: { display: true, position: 'bottom' as const } },
   scales: { x: { beginAtZero: true, title: { display: true, text: 'Points de Malus' } } }
+};
+
+// Options spécifiques pour le graphique empilé (Stacked Bar)
+const stackedBarOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    // On cache la légende si elle est trop grosse, le tooltip suffira pour lire la donnée
+    legend: { display: false },
+    tooltip: { mode: 'index' as const, intersect: false }
+  },
+  scales: {
+    x: { stacked: true },
+    y: { stacked: true, beginAtZero: true, title: { display: true, text: "Nombre d'erreurs commises" } }
+  }
 };
 </script>
 
 <style scoped>
-.header { 
-  margin-bottom: 30px; 
-}
-.header h1 { 
-  font-size: 1.6rem; 
-  color: var(--primary); 
-  margin: 0; 
-}
-.loading { 
-  padding: 40px; 
-  text-align: center; 
-  color: #7f8c8d; 
-  font-size: 1.1rem; 
+/* En-tête */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 30px;
 }
 
-.section-title { 
-  font-size: 1.2rem; 
-  color: #7f8c8d; 
-  border-bottom: 2px solid #eee; 
-  padding-bottom: 5px; 
-  margin-top: 30px; 
-  margin-bottom: 15px; 
+.header-icon {
+  color: var(--primary);
 }
 
-/* Grilles. */
-.grid-3 { 
-  display: grid; 
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
-  gap: 20px; 
-  margin-bottom: 20px; 
-}
-.grid-2 { 
-  display: grid; 
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
-  gap: 20px; 
-  margin-bottom: 20px; 
+.header h1 {
+  font-size: 1.6rem;
+  color: var(--primary);
+  margin: 0;
 }
 
-/* Cartes. */
-.card { 
-  background: white; 
-  padding: 25px; 
-  border-radius: 8px; 
-  box-shadow: 0 2px 5px rgba(0,0,0,0.02); 
-  border: 1px solid #e1e8ed; 
-}
-.card h3 { 
-  font-size: 1rem; 
-  color: var(--primary); 
-  margin-top: 0; 
-  margin-bottom: 15px; 
-  border-bottom: 2px solid var(--light); 
-  padding-bottom: 8px; 
+/* Nouvel en-tête de carte pour aligner le titre et le dropdown */
+.card-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  border-bottom: 2px solid var(--light);
+  padding-bottom: 8px;
 }
 
-/* KPIs. */
-.stat-val { 
-  font-size: 2.2rem; 
-  font-weight: bold; 
-  color: var(--accent); 
-  margin-top: 10px; 
-}
-.stat-val.danger { 
-  color: var(--danger); 
-}
-.stat-desc { 
-  font-size: 0.85rem; 
-  color: #7f8c8d; 
-  margin-top: 5px; 
+.card-header-flex h3 {
+  margin: 0;
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
-/* Chart.js. */
-.chart-container { 
-  display: flex; 
-  flex-direction: column; 
-}
-.chart-wrapper { 
-  position: relative; 
-  height: 260px; 
-  width: 100%; 
-  display: flex; 
-  justify-content: center; 
+.select-filter {
+  padding: 5px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  outline: none;
+  cursor: pointer;
 }
 
-.compare-card .chart-wrapper { 
-  height: 200px; 
+/* État vide (Empty State) */
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e1e8ed;
+}
+
+.empty-content {
+  text-align: center;
+  color: #7f8c8d;
+}
+
+.empty-icon {
+  color: #bdc3c7;
+  margin-bottom: 15px;
+}
+
+.empty-content p {
+  margin-bottom: 20px;
+  font-size: 1.1rem;
+}
+
+/* Boutons */
+.btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  border: none;
+  transition: 0.2s;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid #ccc;
+  color: var(--text);
+}
+
+.btn-outline:hover {
+  background: #f8f9fa;
+  border-color: var(--primary);
+}
+
+.btn-with-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Titres de section */
+.section-title {
+  font-size: 1.2rem;
+  color: #7f8c8d;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 5px;
+  margin-top: 30px;
+  margin-bottom: 15px;
+}
+
+/* Grilles */
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+/* Cartes */
+.card {
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+  border: 1px solid #e1e8ed;
+}
+
+.card h3 {
+  font-size: 1rem;
+  color: var(--primary);
+  margin-top: 0;
+  margin-bottom: 15px;
+  border-bottom: 2px solid var(--light);
+  padding-bottom: 8px;
+}
+
+/* KPIs */
+.stat-val {
+  font-size: 2.2rem;
+  font-weight: bold;
+  color: var(--accent);
+  margin-top: 10px;
+}
+
+.stat-val.danger {
+  color: var(--danger);
+}
+
+.stat-desc {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  margin-top: 5px;
+}
+
+/* Chart.js */
+.chart-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-wrapper {
+  position: relative;
+  height: 260px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.compare-card .chart-wrapper {
+  height: 200px;
 }
 </style>

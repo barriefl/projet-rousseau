@@ -131,7 +131,7 @@ export interface Student {
 }
 
 export interface StudentWithScores {
-   id: string
+  id: string
   first_name: string
   last_name: string
 
@@ -296,15 +296,37 @@ export interface RousseauStats {
 }
 
 export interface CustomDataset {
-  effectifData?: number[];
-  useScaling?: boolean;
-  maxEffectif?: number;
-};
+  effectifData?: number[]
+  useScaling?: boolean
+  maxEffectif?: number
+}
 
 export interface CustomBarElement {
-  _originalHeight?: number;
-  height: number;
-};
+  _originalHeight?: number
+  height: number
+}
+
+// --- TYPES POUR LE DASHBOARD É.M.I.L.E. ---
+export interface AverageScores {
+  Initial: number
+  Final: number
+}
+
+export interface EmileStatsResponse {
+  total_students: number
+  total_submissions: number
+  global_average: number
+  group_distribution_by_promo: Record<string, Record<string, number>>
+  group_averages: Record<string, AverageScores>
+  promo_averages: Record<string, AverageScores>
+  comparison_tool: Record<string, AverageScores>
+  comparison_human_robot: Record<string, AverageScores>
+  comparison_motivation: Record<string, number>
+  mistakes_stats: {
+    global: Record<string, Record<string, number>>
+    promotions: Record<string, Record<string, Record<string, number>>>
+  }
+}
 
 // --- TYPES POUR LES DICTÉES RÉFÉRENTES. ---
 export interface DictationCreatePayload {

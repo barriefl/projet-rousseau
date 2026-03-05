@@ -1,6 +1,7 @@
 from sqlmodel import Session, select
 
 from app.models import AssessmentResult, AssessmentType, Dictation, Student, Submission
+from app.models.entities import Category
 
 
 class StatsService:
@@ -171,7 +172,9 @@ class StatsService:
         def add_s(fam, cat, lab, s_id):
             if not lab or lab == "None":
                 lab = "Non renseigné"
-            t = h4_results[fam][cat].setdefault(lab, {"Initial": [], "Progress": [], "Effectif": 0})
+            t = h4_results[fam][cat].setdefault(
+                lab, {"Initial": [], "Progress": [], "Effectif": 0}
+            )
 
             t["Effectif"] += 1
 
@@ -260,122 +263,148 @@ class StatsService:
         students = self.session.exec(select(Student)).all()
         submissions = self.session.exec(select(Submission)).all()
 
+        categories = self.session.exec(select(Category)).all()
+        category_map = {c.id: c.name for c in categories}
+
         total_students = len(students)
         total_submissions = len(submissions)
 
-        initial_scores = {}
-        final_scores = {}
-
-        for student in students:
-            for sub in student.submissions:
-                if (
-                    sub.assessment_type.name == "INITIAL"
-                    and sub.final_score is not None
-                ):
-                    initial_scores[student.id] = sub.final_score
-                elif (
-                    sub.assessment_type.name == "FINAL" and sub.final_score is not None
-                ):
-                    final_scores[student.id] = sub.final_score
-
-        initial_g0_g4 = [
-            score
-            for s_id, score in initial_scores.items()
-            if any(s.id == s_id and s.group and s.group.name != "G5" for s in students)
-        ]
-        avg_initial_g0_g4 = (
-            sum(initial_g0_g4) / len(initial_g0_g4) if initial_g0_g4 else 0.0
-        )
-
-        group_distribution = {}
+        group_distribution_by_promo = {}
         for s in students:
-            g_name = s.group.value if s.group else "Sans groupe"
-            group_distribution[g_name] = group_distribution.get(g_name, 0) + 1
+            p_name = s.promotion.name if s.promotion else "Sans promo"
+            g_name = s.group.name if s.group else "Sans groupe"
 
-        valid_final_scores = list(final_scores.values())
-        global_average = (
-            round(sum(valid_final_scores) / len(valid_final_scores), 2)
-            if valid_final_scores
-            else 0.0
-        )
+            if p_name not in group_distribution_by_promo:
+                group_distribution_by_promo[p_name] = {}
+            group_distribution_by_promo[p_name][g_name] = (
+                group_distribution_by_promo[p_name].get(g_name, 0) + 1
+            )
 
         promo_data = {}
         group_data = {}
+        valid_final_scores = []
 
         tool_i_g2, tool_f_g2, tool_i_g5, tool_f_g5 = [], [], [], []
         hr_i_human, hr_f_human, hr_i_robot, hr_f_robot = [], [], [], []
-        mot_i_g1, mot_f_g1, mot_i_g2, mot_f_g2, mot_i_g3, mot_f_g3 = (
-            [],
-            [],
-            [],
-            [],
-            [],
-            [],
-        )
+        (
+            mot_i_g1,
+            mot_f_g1,
+            mot_i_g2,
+            mot_f_g2,
+            mot_i_g3,
+            mot_f_g3,
+            mot_i_g4,
+            mot_f_g4,
+        ) = [], [], [], [], [], [], [], []
 
-        for s in [st for st in students if st.id in final_scores]:
-            f_score = final_scores[s.id]
-            i_score = initial_scores.get(s.id)
+        mistakes_stats = {"global": {}, "promotions": {}}
 
-            if i_score is None and s.group and s.group.name == "G5":
-                i_score = avg_initial_g0_g4
+        for sub in submissions:
+            if sub.final_score is None:
+                continue
 
-            p_name = s.promo or "Sans promo"
+            ass_type = (
+                sub.assessment_type.name
+                if hasattr(sub.assessment_type, "name")
+                else str(sub.assessment_type).upper()
+            )
+            score = sub.final_score
+            student = sub.student
+
+            if not student:
+                continue
+
+            p_name = student.promotion.name if student.promotion else "Sans promo"
+            g_code = student.group.name if student.group else "Sans groupe"
+
             if p_name not in promo_data:
                 promo_data[p_name] = {"init": [], "fin": []}
-            if i_score is not None:
-                promo_data[p_name]["init"].append(i_score)
-            promo_data[p_name]["fin"].append(f_score)
+            if g_code not in group_data:
+                group_data[g_code] = {"init": [], "fin": []}
 
-            if s.group:
-                g_val = s.group.value
-                g_code = s.group.name
-
-                if g_val not in group_data:
-                    group_data[g_val] = {"init": [], "fin": []}
-                if i_score is not None:
-                    group_data[g_val]["init"].append(i_score)
-                group_data[g_val]["fin"].append(f_score)
-
-                if g_code == "G2":
-                    if i_score is not None:
-                        tool_i_g2.append(i_score)
-                    tool_f_g2.append(f_score)
-                elif g_code == "G5":
-                    if i_score is not None:
-                        tool_i_g5.append(i_score)
-                    tool_f_g5.append(f_score)
-
-                if g_code == "G4":
-                    if i_score is not None:
-                        hr_i_human.append(i_score)
-                    hr_f_human.append(f_score)
-                elif g_code in ["G2", "G3", "G5"]:
-                    if i_score is not None:
-                        hr_i_robot.append(i_score)
-                    hr_f_robot.append(f_score)
+            if ass_type == "INITIAL":
+                promo_data[p_name]["init"].append(score)
+                group_data[g_code]["init"].append(score)
 
                 if g_code == "G1":
-                    if i_score is not None:
-                        mot_i_g1.append(i_score)
-                    mot_f_g1.append(f_score)
+                    mot_i_g1.append(score)
                 elif g_code == "G2":
-                    if i_score is not None:
-                        mot_i_g2.append(i_score)
-                    mot_f_g2.append(f_score)
+                    tool_i_g2.append(score)
+                    hr_i_robot.append(score)
+                    mot_i_g2.append(score)
                 elif g_code == "G3":
-                    if i_score is not None:
-                        mot_i_g3.append(i_score)
-                    mot_f_g3.append(f_score)
+                    hr_i_robot.append(score)
+                    mot_i_g3.append(score)
+                elif g_code == "G4":
+                    hr_i_human.append(score)
+                    mot_i_g4.append(score)
+                elif g_code == "G5":
+                    tool_i_g5.append(score)
+                    hr_i_robot.append(score)
+
+            elif ass_type == "FINAL":
+                valid_final_scores.append(score)
+                promo_data[p_name]["fin"].append(score)
+                group_data[g_code]["fin"].append(score)
+
+                if g_code == "G1":
+                    mot_f_g1.append(score)
+                elif g_code == "G2":
+                    tool_f_g2.append(score)
+                    hr_f_robot.append(score)
+                    mot_f_g2.append(score)
+                elif g_code == "G3":
+                    hr_f_robot.append(score)
+                    mot_f_g3.append(score)
+                elif g_code == "G4":
+                    hr_f_human.append(score)
+                    mot_f_g4.append(score)
+                elif g_code == "G5":
+                    tool_f_g5.append(score)
+                    hr_f_robot.append(score)
+
+            if hasattr(sub, "mistakes") and sub.mistakes:
+                if p_name not in mistakes_stats["promotions"]:
+                    mistakes_stats["promotions"][p_name] = {}
+
+                for mistake in sub.mistakes:
+                    cat_name = category_map.get(mistake.category_id, "Non catégorisé")
+
+                    t_rousseau = (
+                        mistake.type_rousseau.value
+                        if hasattr(mistake.type_rousseau, "value")
+                        else str(mistake.type_rousseau)
+                    )
+
+                    if t_rousseau not in mistakes_stats["global"]:
+                        mistakes_stats["global"][t_rousseau] = {}
+                    mistakes_stats["global"][t_rousseau][cat_name] = (
+                        mistakes_stats["global"][t_rousseau].get(cat_name, 0) + 1
+                    )
+
+                    if t_rousseau not in mistakes_stats["promotions"][p_name]:
+                        mistakes_stats["promotions"][p_name][t_rousseau] = {}
+                    mistakes_stats["promotions"][p_name][t_rousseau][cat_name] = (
+                        mistakes_stats["promotions"][p_name][t_rousseau].get(
+                            cat_name, 0
+                        )
+                        + 1
+                    )
 
         def safe_avg(scores_list):
             return round(sum(scores_list) / len(scores_list), 2) if scores_list else 0.0
+
+        def calc_progress(init_list, fin_list):
+            if not init_list or not fin_list:
+                return 0.0
+            return round(safe_avg(init_list) - safe_avg(fin_list), 2)
+
+        global_average = safe_avg(valid_final_scores)
 
         promo_averages = {
             p: {"Initial": safe_avg(data["init"]), "Final": safe_avg(data["fin"])}
             for p, data in promo_data.items()
         }
-
         group_averages = {
             g: {"Initial": safe_avg(data["init"]), "Final": safe_avg(data["fin"])}
             for g, data in group_data.items()
@@ -385,7 +414,10 @@ class StatsService:
             "total_students": total_students,
             "total_submissions": total_submissions,
             "global_average": global_average,
-            "group_distribution": dict(sorted(group_distribution.items())),
+            "group_distribution_by_promo": {
+                promo: dict(sorted(groups.items()))
+                for promo, groups in sorted(group_distribution_by_promo.items())
+            },
             "group_averages": dict(sorted(group_averages.items())),
             "promo_averages": dict(sorted(promo_averages.items())),
             "comparison_tool": {
@@ -409,17 +441,10 @@ class StatsService:
                 },
             },
             "comparison_motivation": {
-                "Autonomie (G1)": {
-                    "Initial": safe_avg(mot_i_g1),
-                    "Final": safe_avg(mot_f_g1),
-                },
-                "Jalons obligatoires (G2)": {
-                    "Initial": safe_avg(mot_i_g2),
-                    "Final": safe_avg(mot_f_g2),
-                },
-                "Salle (G3)": {
-                    "Initial": safe_avg(mot_i_g3),
-                    "Final": safe_avg(mot_f_g3),
-                },
+                "Autonomie (G1)": calc_progress(mot_i_g1, mot_f_g1),
+                "Jalons obligatoires (G2)": calc_progress(mot_i_g2, mot_f_g2),
+                "Salle (G3)": calc_progress(mot_i_g3, mot_f_g3),
+                "Correction Humaine (G4)": calc_progress(mot_i_g4, mot_f_g4),
             },
+            "mistakes_stats": mistakes_stats,
         }
