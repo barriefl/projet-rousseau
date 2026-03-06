@@ -1,6 +1,6 @@
 <template>
   <div class="etudiants-view">
-    <div class="header">
+    <div class="page-header">
       <h1>Liste des Étudiants</h1>
     </div>
 
@@ -154,15 +154,9 @@ const handleUpdate = async (payload: StudentUpdatePayload) => {
 </script>
 
 <style scoped>
-.header {
-  margin-bottom: 20px;
-}
-
-.header h1 {
-  font-size: 1.6rem;
-  color: var(--primary);
-}
-
+/* ==========================================================================
+   TABLEAU.
+   ========================================================================== */
 table {
   width: 100%;
   border-collapse: collapse;
@@ -191,59 +185,17 @@ tr:hover {
   background-color: #fcfcfc;
 }
 
-.btn-danger {
-  background: var(--danger);
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  transition: 0.2s;
-  font-weight: 500;
-}
-
-.btn-danger:hover {
-  background: #c0392b;
-  transform: scale(1.05);
-}
-
+/* ==========================================================================
+   BOUTONS.
+   ========================================================================== */
 .action-buttons {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
 }
 
-.btn-primary {
-  background: var(--accent);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: 0.2s;
-  font-weight: 500;
-  padding: 6px 12px;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #12876f;
-  transform: scale(1.05);
-}
-
 .btn-sm {
   padding: 6px 12px;
   font-size: 0.85rem;
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid #ccc;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.btn-outline:hover {
-  background: #eee;
 }
 </style>

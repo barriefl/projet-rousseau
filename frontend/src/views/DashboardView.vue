@@ -1,6 +1,6 @@
 <template>
   <div class="dashboard-etude">
-    <div class="header">
+    <div class="page-header">
       <h1>Étude Rousseau : Analyses et Conclusions</h1>
     </div>
 
@@ -344,41 +344,9 @@ const horizontalOptions: ChartOptions<'bar'> = {
 </script>
 
 <style scoped>
-.header {
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-}
-
-.section-title {
-  font-size: 1.2rem;
-  color: #7f8c8d;
-  border-bottom: 2px solid #eee;
-  padding-bottom: 5px;
-  margin-top: 40px;
-}
-
-.grid-2 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
-  gap: 20px;
-}
-
-.grid-1 {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 20px;
-}
-
-.card {
-  background: white;
-  padding: 30px;
-  border-radius: 8px;
-  border: 1px solid #e1e8ed;
-  margin-top: 15px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
-}
-
+/* ==========================================================================
+     STYLE GRAPHIQUES..
+     ========================================================================== */
 .chart-wrapper {
   height: 320px;
   position: relative;
@@ -392,6 +360,15 @@ const horizontalOptions: ChartOptions<'bar'> = {
   background: #f8f9fa;
 }
 
+.chart-desc {
+  font-size: 0.9rem;
+  color: #95a5a6;
+  margin-bottom: 10px;
+}
+
+/* ==========================================================================
+     STYLE H4.
+     ========================================================================== */
 .h4-section-header {
   margin-top: 40px;
   margin-bottom: 20px;
@@ -425,35 +402,17 @@ const horizontalOptions: ChartOptions<'bar'> = {
   height: 16px;
 }
 
+.h4-advanced-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .header-with-select {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 25px;
-}
-
-.chart-desc {
-  font-size: 0.9rem;
-  color: #95a5a6;
-  margin-bottom: 10px;
-}
-
-/* Nouveaux styles pour les contrôles H4 */
-.h4-controls-container {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 12px;
-  margin: 20px 0 30px 0;
-  border: 1px solid #edf2f7;
-}
-
-.h4-advanced-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
 }
 
 .sort-group {
@@ -462,6 +421,9 @@ const horizontalOptions: ChartOptions<'bar'> = {
   gap: 12px;
 }
 
+/* ==========================================================================
+     BOUTONS.
+     ========================================================================== */
 .btn-toggle-group {
   display: flex;
   background: #e2e8f0;

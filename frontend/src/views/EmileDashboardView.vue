@@ -1,14 +1,13 @@
 <template>
   <div class="emile-dashboard">
-    <div class="header">
-      <LayoutDashboard :size="28" class="header-icon" />
+    <div class="page-header">
       <h1>Tableau de Bord É.M.I.L.E.</h1>
     </div>
 
     <AppLoading v-if="isLoading" message="Récupération des statistiques analytiques..." />
 
     <AppEmptyState v-else-if="!stats" title="Aucune donnée statistique"
-      message="Impossible de charger les données du tableau de bord." action-label="Réessayer" @action="fetchStats" />
+      message="Impossible de charger les données du tableau de bord." :showRetry="true" :loading="isLoading" @retry="fetchStats" />
 
     <div v-else>
       <div class="grid-3">
@@ -114,7 +113,6 @@ import api from '@/services/api';
 
 import AppLoading from '@/components/common/AppLoading.vue';
 import AppEmptyState from '@/components/common/AppEmptyState.vue';
-import { LayoutDashboard } from 'lucide-vue-next';
 import type { EmileStatsResponse } from '@/types';
 
 import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement } from 'chart.js';
@@ -151,14 +149,13 @@ onMounted(() => {
   fetchStats();
 });
 
-// Liste de toutes les promos pour les selects
 const availablePromos = computed(() => {
   return stats.value?.group_distribution_by_promo ? Object.keys(stats.value.group_distribution_by_promo) : [];
 });
 
 // --- DATA POUR LES GRAPHIQUES ---
 
-// 1. Répartition par groupe (Désormais un Bar Chart filtré par Promo)
+// Répartition par groupe.
 const distributionChartData = computed(() => {
   const currentStats = stats.value;
   if (!currentStats?.group_distribution_by_promo || !selectedPromoDist.value) return { labels: [], datasets: [] };
@@ -176,7 +173,7 @@ const distributionChartData = computed(() => {
   };
 });
 
-// 2. Moyennes par groupe
+// Moyennes par groupe.
 const averagesChartData = computed(() => {
   const currentStats = stats.value;
   if (!currentStats?.group_averages) return { labels: [], datasets: [] };
@@ -190,7 +187,7 @@ const averagesChartData = computed(() => {
   };
 });
 
-// 3. Moyennes par Promo
+// Moyennes par promo.
 const promoChartData = computed(() => {
   const currentStats = stats.value;
   if (!currentStats?.promo_averages) return { labels: [], datasets: [] };
@@ -204,7 +201,7 @@ const promoChartData = computed(() => {
   };
 });
 
-// 4. Motivation
+// Motivation.
 const motivationChartData = computed(() => {
   const currentStats = stats.value;
   if (!currentStats?.comparison_motivation) return { labels: [], datasets: [] };
@@ -220,7 +217,7 @@ const motivationChartData = computed(() => {
   };
 });
 
-// 5. Graphique Empilé des Fautes.
+// Graphique empilé des fautes.
 const mistakesChartData = computed(() => {
   const currentStats = stats.value;
   if (!currentStats?.mistakes_stats) return { labels: [], datasets: [] };
@@ -256,7 +253,7 @@ const mistakesChartData = computed(() => {
   };
 });
 
-// 6 & 7. Outils & Humain vs Robot
+// Outils & Humain vs Robot.
 const toolChartData = computed(() => {
   const currentStats = stats.value;
   if (!currentStats?.comparison_tool) return { labels: [], datasets: [] };
@@ -300,12 +297,10 @@ const horizontalBarOptions = {
   scales: { x: { beginAtZero: true, title: { display: true, text: 'Points de Malus' } } }
 };
 
-// Options spécifiques pour le graphique empilé (Stacked Bar)
 const stackedBarOptions = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
-    // On cache la légende si elle est trop grosse, le tooltip suffira pour lire la donnée
     legend: { display: false },
     tooltip: { mode: 'index' as const, intersect: false }
   },
@@ -317,25 +312,9 @@ const stackedBarOptions = {
 </script>
 
 <style scoped>
-/* En-tête */
-.header {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 30px;
-}
-
-.header-icon {
-  color: var(--primary);
-}
-
-.header h1 {
-  font-size: 1.6rem;
-  color: var(--primary);
-  margin: 0;
-}
-
-/* Nouvel en-tête de carte pour aligner le titre et le dropdown */
+/* ==========================================================================
+     TITRES GRAPHIQUES.
+     ========================================================================== */
 .card-header-flex {
   display: flex;
   justify-content: space-between;
@@ -360,104 +339,9 @@ const stackedBarOptions = {
   cursor: pointer;
 }
 
-/* État vide (Empty State) */
-.empty-state {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 400px;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e1e8ed;
-}
-
-.empty-content {
-  text-align: center;
-  color: #7f8c8d;
-}
-
-.empty-icon {
-  color: #bdc3c7;
-  margin-bottom: 15px;
-}
-
-.empty-content p {
-  margin-bottom: 20px;
-  font-size: 1.1rem;
-}
-
-/* Boutons */
-.btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  border: none;
-  transition: 0.2s;
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid #ccc;
-  color: var(--text);
-}
-
-.btn-outline:hover {
-  background: #f8f9fa;
-  border-color: var(--primary);
-}
-
-.btn-with-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-/* Titres de section */
-.section-title {
-  font-size: 1.2rem;
-  color: #7f8c8d;
-  border-bottom: 2px solid #eee;
-  padding-bottom: 5px;
-  margin-top: 30px;
-  margin-bottom: 15px;
-}
-
-/* Grilles */
-.grid-3 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.grid-2 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-/* Cartes */
-.card {
-  background: white;
-  padding: 25px;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
-  border: 1px solid #e1e8ed;
-}
-
-.card h3 {
-  font-size: 1rem;
-  color: var(--primary);
-  margin-top: 0;
-  margin-bottom: 15px;
-  border-bottom: 2px solid var(--light);
-  padding-bottom: 8px;
-}
-
-/* KPIs */
+/* ==========================================================================
+     KPIs.
+     ========================================================================== */
 .stat-val {
   font-size: 2.2rem;
   font-weight: bold;
@@ -475,7 +359,9 @@ const stackedBarOptions = {
   margin-top: 5px;
 }
 
-/* Chart.js */
+/* ==========================================================================
+     GRAPHIQUES.
+     ========================================================================== */
 .chart-container {
   display: flex;
   flex-direction: column;

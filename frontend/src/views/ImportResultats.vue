@@ -1,7 +1,7 @@
 <template>
   <div class="import-workspace">
-    <div class="header">
-      <button class="btn btn-outline" style="margin-right: 15px;" @click="$router.push('/gestion')">← Retour</button>
+    <div class="page-header">
+      <button class="btn btn-outline" style="margin-right: 15px;" @click="$router.push('/')">← Retour</button>
       <h1 style="display: inline-block;">Importation des Résultats (Voltaire / Ecri+)</h1>
     </div>
 
@@ -10,7 +10,7 @@
 
       <div class="form-grid">
         <div class="form-group">
-          <label>Promotion cible :</label>
+          <label>Promotion cible * :</label>
           <select v-model="selectedPromotion" :disabled="isAnalyzing" class="action-select">
             <option value="" disabled>-- Choisir --</option>
             <option v-for="promo in promotions" :key="promo.id" :value="promo.id">
@@ -20,7 +20,7 @@
         </div>
 
         <div class="form-group">
-          <label>Outil / Plateforme :</label>
+          <label>Outil / Plateforme * :</label>
           <select v-model="selectedPlatform" :disabled="isAnalyzing" class="action-select">
             <option value="" disabled>-- Choisir --</option>
             <option v-for="type in Object.values(Platforms)" :key="type" :value="type">
@@ -30,7 +30,7 @@
         </div>
 
         <div class="form-group">
-          <label>Type d'évaluation :</label>
+          <label>Type d'évaluation * :</label>
           <select v-model="selectedType" :disabled="isAnalyzing" class="action-select">
             <option value="" disabled>-- Choisir --</option>
             <option v-for="type in Object.values(AssessmentTypes)" :key="type" :value="type">
@@ -121,7 +121,7 @@
 
       <div class="execute-actions">
         <button class="btn btn-outline" @click="resetImport" :disabled="isExecuting">Annuler</button>
-        <button class="btn btn-success btn-with-icon" @click="executeImport" :disabled="isExecuting">
+        <button class="btn btn-primary btn-with-icon" @click="executeImport" :disabled="isExecuting">
           <Loader2 v-if="isExecuting" :size="18" class="animate-spin" />
           <Save v-else :size="18" />
           <span>{{ isExecuting ? 'Importation en cours...' : 'Sauvegarder les résultats' }}</span>
@@ -327,21 +327,12 @@ const resetImport = () => {
 </script>
 
 <style scoped>
+/* ==========================================================================
+   STYLE DE LA PAGE.
+   ========================================================================== */
 .import-workspace {
-  max-width: 1000px;
+  max-width: 95%;
   margin: 0 auto;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 25px;
-}
-
-.header h1 {
-  font-size: 1.6rem;
-  color: var(--primary);
-  margin: 0;
 }
 
 .panel {
@@ -374,7 +365,9 @@ const resetImport = () => {
   color: #333;
 }
 
-/* --- Style Menu Déroulant. --- */
+/* ==========================================================================
+   MENU DÉROULANT.
+   ========================================================================== */
 .action-select {
   width: 100%;
   padding: 10px 32px 10px 12px;
@@ -410,7 +403,9 @@ const resetImport = () => {
   opacity: 0.7;
 }
 
-/* --- Style File Input. --- */
+/* ==========================================================================
+   FILE INPUT.
+   ========================================================================== */
 .file-input {
   display: block;
   width: 100%;
@@ -453,52 +448,9 @@ const resetImport = () => {
   cursor: not-allowed;
 }
 
-.btn {
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 1rem;
-  border: none;
-  transition: 0.2s;
-}
-
-.btn-primary {
-  background: var(--accent);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  filter: brightness(1.1);
-}
-
-.btn-success {
-  background: #27ae60;
-  color: white;
-}
-
-.btn-success:hover:not(:disabled) {
-  background: #219653;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(39, 174, 96, 0.2);
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid #ccc;
-  color: #555;
-}
-
-.btn-outline:hover:not(:disabled) {
-  background: #f8f9fa;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Aperçu Stats. */
+/* ==========================================================================
+   APERÇU.
+   ========================================================================== */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -609,7 +561,6 @@ const resetImport = () => {
   color: #2c3e50;
 }
 
-/* Alignement des icônes dans les titres H3 */
 .title-with-icon {
   display: flex;
   align-items: center;
@@ -617,25 +568,18 @@ const resetImport = () => {
   margin: 20px 0;
 }
 
-/* On définit le bouton success s'il n'existe pas encore */
-.btn-success {
-  background-color: var(--accent);
-  /* Ton vert teal */
-  color: white;
-}
-
-.btn-success:hover:not(:disabled) {
-  background-color: #16a085;
-}
-
-/* Style pour l'icône de succès géante */
+/* ==========================================================================
+   SUCCÈS.
+   ========================================================================== */
 .success-container {
   display: flex;
   justify-content: center;
   padding: 20px;
 }
 
-/* Animation de rotation (déjà vue précédemment, mais au cas où) */
+/* ==========================================================================
+   ANIMATION.
+   ========================================================================== */
 .animate-spin {
   animation: spin 1s linear infinite;
 }

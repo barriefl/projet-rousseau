@@ -1,6 +1,6 @@
 <template>
   <div class="emile-workspace">
-    <div class="header">
+    <div class="page-header">
       <button class="btn btn-outline" style="margin-right: 15px;" @click="router.push('/gestion')">← Retour</button>
       <h1 style="display: inline-block;">É.M.I.L.E.</h1>
     </div>
@@ -23,10 +23,10 @@
 
         <div class="student-scores">
           <span class="score-badge" :class="getScoreColorClass(student.initial_score, 'initial')">
-            I: {{ formatScore(student.initial_score) }}
+            I : {{ formatScore(student.initial_score) }}
           </span>
           <span class="score-badge" :class="getScoreColorClass(student.final_score, 'final')">
-            F: {{ formatScore(student.final_score) }}
+            F : {{ formatScore(student.final_score) }}
           </span>
         </div>
       </div>
@@ -40,7 +40,7 @@
       </div>
 
       <div v-else-if="studentSubmissions.length > 0">
-        <button v-for="sub in studentSubmissions" :key="sub.id" class="dictation-btn"
+        <button v-for="sub in studentSubmissions" :key="sub.id" class="btn dictation-btn"
           :class="{ 'active': selectedSubmission?.id === sub.id }" @click="loadSubmissionDetails(sub)">
           Dictée {{ sub.assessment_type === 'Initiale' ? 'Initiale' : 'Finale' }} ({{ new
             Date(sub.created_at).toLocaleDateString('fr-FR', { year: 'numeric' }) }})
@@ -121,6 +121,9 @@ import { useRouter } from 'vue-router';
 import api from '@/services/api';
 import type { Student, StudentSubmission, StudentWithScores, SubmissionDetails } from '@/types';
 import AppLoading from '@/components/common/AppLoading.vue';
+import { useUiStore } from '@/stores/ui';
+
+const ui = useUiStore();
 
 const router = useRouter();
 
@@ -136,6 +139,8 @@ const studentSubmissions = ref<StudentSubmission[]>([]);
 const selectedSubmission = ref<StudentSubmission | null>(null);
 const submissionDetails = ref<SubmissionDetails | null>(null);
 
+const tooltip = ref({ visible: false, x: 0, y: 0, type: '', malus: '', corr: '', desc: '', ruleId: '' });
+
 // --- COMPUTED (Recherche). ---
 const filteredStudents = computed(() => {
   return students.value.filter(s =>
@@ -143,9 +148,6 @@ const filteredStudents = computed(() => {
     s.first_name.toLowerCase().includes(searchQuery.value.toLowerCase())
   );
 });
-
-// État de l'infobulle.
-const tooltip = ref({ visible: false, x: 0, y: 0, type: '', malus: '', corr: '', desc: '', ruleId: '' });
 
 const sortedMistakes = computed(() => {
   if (!submissionDetails.value?.mistakes) return [];
@@ -159,6 +161,7 @@ onMounted(async () => {
     students.value = data.sort((a: Student, b: Student) => a.last_name.localeCompare(b.last_name, 'fr'));
   } catch (error) {
     console.error("Erreur chargement étudiants :", error);
+    ui.notify("Erreur lors de la récupération des scores.", "error");
   } finally {
     isLoadingStudents.value = false;
   }
@@ -234,6 +237,7 @@ const selectStudent = async (student: StudentWithScores) => {
     });
   } catch (error) {
     console.error("Erreur dictées :", error);
+    ui.notify("Impossible de récupérer les dictées de l'étudiant.", "error");
   } finally {
     isLoadingSubmissions.value = false;
   }
@@ -249,7 +253,7 @@ const loadSubmissionDetails = async (sub: StudentSubmission) => {
     submissionDetails.value = res;
   } catch (error) {
     console.error("Erreur détails :", error);
-    alert("Impossible de charger le contenu détaillé de la dictée.");
+    ui.notify("Impossible de charger le contenu détaillé de la dictée.", "error");
   } finally {
     isLoadingDetails.value = false;
   }
@@ -281,19 +285,9 @@ const handleMouseOut = (event: MouseEvent) => {
 </script>
 
 <style scoped>
-/* CSS de base. */
-.header {
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-}
-
-.header h1 {
-  font-size: 1.6rem;
-  color: var(--primary);
-  margin: 0;
-}
-
+/* ==========================================================================
+     BARRE DE RECHERCHE.
+     ========================================================================== */
 .search-container {
   margin-bottom: 15px;
 }
@@ -312,7 +306,9 @@ const handleMouseOut = (event: MouseEvent) => {
   border-color: var(--accent);
 }
 
-/* Liste étudiants. */
+/* ==========================================================================
+     LISTE DES ÉTUDIANTS.
+     ========================================================================== */
 .student-scroll-list {
   display: flex;
   gap: 15px;
@@ -368,26 +364,6 @@ const handleMouseOut = (event: MouseEvent) => {
   text-align: center;
 }
 
-.badge-empty {
-  background: #f1f3f5;
-  color: #94a3b8;
-}
-
-.badge-good {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.badge-medium {
-  background: #fff8c1;
-  color: #9a3412;
-}
-
-.badge-bad {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
 .student-card:hover {
   transform: translateY(-2px);
   border-color: var(--accent);
@@ -399,7 +375,9 @@ const handleMouseOut = (event: MouseEvent) => {
   background-color: #f0f8ff;
 }
 
-/* Dictées. */
+/* ==========================================================================
+     DICTÉES.
+     ========================================================================== */
 .dictation-selector {
   margin-bottom: 20px;
   padding: 20px;
@@ -430,7 +408,9 @@ const handleMouseOut = (event: MouseEvent) => {
   border-color: var(--accent);
 }
 
-/* L'Atelier (Zone principale). */
+/* ==========================================================================
+     ZONE DU TEXTE.
+     ========================================================================== */
 .atelier-container {
   display: grid;
   grid-template-columns: 2fr 1fr;
@@ -443,7 +423,6 @@ const handleMouseOut = (event: MouseEvent) => {
   padding: 30px;
   border-radius: 8px;
   border: 1px solid #e1e8ed;
-  font-family: 'Georgia', serif;
   font-size: 1.15rem;
   min-height: 400px;
   position: relative;
@@ -488,7 +467,9 @@ const handleMouseOut = (event: MouseEvent) => {
   color: #9b59b6;
 }
 
-/* L'Infobulle. */
+/* ==========================================================================
+     INFOBULLE.
+     ========================================================================== */
 .reverso-tooltip {
   position: absolute;
   background: white;
@@ -526,7 +507,9 @@ const handleMouseOut = (event: MouseEvent) => {
   font-style: italic;
 }
 
-/* Le Panneau Latéral. */
+/* ==========================================================================
+     LISTE DES ERREURS & PANEL.
+     ========================================================================== */
 .panel {
   background: white;
   padding: 20px;
@@ -555,7 +538,6 @@ const handleMouseOut = (event: MouseEvent) => {
   margin: 5px 0;
 }
 
-/* Liste des erreurs défilante. */
 .error-list {
   overflow-y: auto;
   flex: 1;
@@ -596,25 +578,5 @@ const handleMouseOut = (event: MouseEvent) => {
 
 .error-item[data-type="Autre"] {
   border-left-color: #9b59b6;
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: 0.2s;
-  border: none;
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid #ccc;
-  color: var(--text);
-}
-
-.btn-outline:hover {
-  background: #f8f9fa;
-  border-color: var(--primary);
 }
 </style>

@@ -1,8 +1,8 @@
 <template>
   <div class="analyse-view">
-    <div class="header">
+    <div class="page-header">
       <button class="btn btn-outline" @click="router.push('/gestion')">← Retour</button>
-      <h1>Tableau de bord & Progression</h1>
+      <h1>Analyse des travaux</h1>
     </div>
 
     <AppLoading v-if="isLoading" message="Chargement des étudiants et de leur progrès..." />
@@ -148,26 +148,9 @@ const avgProgress = computed(() => {
 </script>
 
 <style scoped>
-.header {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 30px;
-}
-
-.header h1 {
-  font-size: 1.6rem;
-  color: var(--primary);
-  margin: 0;
-}
-
-.loading {
-  padding: 40px;
-  text-align: center;
-  color: #7f8c8d;
-  font-size: 1.1rem;
-}
-
+/* ==========================================================================
+     KPIs.
+     ========================================================================== */
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -198,20 +181,16 @@ const avgProgress = computed(() => {
   color: var(--text);
 }
 
-.text-warning {
-  color: #e67e22;
-}
-
-.text-primary {
-  color: var(--primary);
-}
-
 .text-success {
-  color: #27ae60;
+  color: var(--success);
+}
+
+.text-warning {
+  color: var(--warning);
 }
 
 .text-danger {
-  color: #e74c3c;
+  color: var(--danger);
 }
 
 .text-muted {
@@ -219,13 +198,9 @@ const avgProgress = computed(() => {
   font-style: italic;
 }
 
-.table-container {
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e1e8ed;
-  overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
-}
+/* ==========================================================================
+     TABLE.
+     ========================================================================== */
 
 .table-header {
   padding: 20px;
@@ -238,48 +213,27 @@ const avgProgress = computed(() => {
 
 .table-header h3 {
   margin: 0;
-  color: var(--primary);
-  font-size: 1.2rem;
 }
+
+/* ==========================================================================
+     RECHERCHE.
+     ========================================================================== */
 
 .search-box input {
   padding: 8px 15px;
   border: 1px solid #ccc;
   border-radius: 20px;
   outline: none;
-  width: 250px;
+  width: 300px;
 }
 
 .search-box input:focus {
   border-color: var(--accent);
 }
 
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-.data-table th {
-  background: white;
-  padding: 15px 20px;
-  font-weight: 600;
-  color: #7f8c8d;
-  border-bottom: 2px solid #eee;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-}
-
-.data-table td {
-  padding: 15px 20px;
-  border-bottom: 1px solid #eee;
-  vertical-align: middle;
-}
-
-.data-table tr:hover {
-  background-color: #f8f9fa;
-}
-
+/* ==========================================================================
+     BADGES.
+     ========================================================================== */
 .badge-group {
   background: #ecf0f1;
   padding: 4px 10px;
@@ -301,40 +255,20 @@ const avgProgress = computed(() => {
 }
 
 .bg-success {
-  background-color: #27ae60;
+  background-color: var(--success);
 }
 
 .bg-danger {
-  background-color: #e74c3c;
+  background-color: var(--danger);
 }
 
 .bg-neutral {
-  background-color: #95a5a6;
+  background-color: var(--neutral);
 }
 
 .empty-state {
   text-align: center;
   padding: 30px !important;
   color: #7f8c8d;
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: 0.2s;
-  border: none;
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid #ccc;
-  color: var(--text);
-}
-
-.btn-outline:hover {
-  background: #f8f9fa;
-  border-color: var(--primary);
 }
 </style>

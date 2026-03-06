@@ -1,6 +1,6 @@
 <template>
   <div class="emile-gestion">
-    <div class="header">
+    <div class="page-header">
       <h1>Gestion des Dictées</h1>
     </div>
 
@@ -34,22 +34,6 @@ const router = useRouter();
 </script>
 
 <style scoped>
-.header {
-  margin-bottom: 20px;
-}
-
-.header h1 {
-  font-size: 1.6rem;
-  color: var(--primary);
-}
-
-.grid-3 {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 25px;
-  margin-top: 30px;
-}
-
 .action-card {
   background: white;
   padding: 30px;

@@ -27,22 +27,23 @@
                         <div class="input-grid">
                             <div class="field">
                                 <label>Nom <span class="req">*</span></label>
-                                <input type="text" v-model="form.last_name" placeholder="ROUSSEAU">
+                                <input class="form-control" type="text" v-model="form.last_name" placeholder="ROUSSEAU">
                             </div>
                             <div class="field">
                                 <label>Prénom <span class="req">*</span></label>
-                                <input type="text" v-model="form.first_name" placeholder="Jean-Jacques">
+                                <input class="form-control" type="text" v-model="form.first_name"
+                                    placeholder="Jean-Jacques">
                             </div>
                             <div class="field">
                                 <label>Promotion</label>
-                                <select v-model="form.promotion_id" :disabled="!!lockPromotionId">
+                                <select class="form-control" v-model="form.promotion_id" :disabled="!!lockPromotionId">
                                     <option v-for="promo in promotions" :key="promo.id" :value="promo.id">{{ promo.name
-                                        }}</option>
+                                    }}</option>
                                 </select>
                             </div>
                             <div class="field">
                                 <label>Groupe</label>
-                                <select v-model="form.group_id">
+                                <select class="form-control" v-model="form.group_id">
                                     <option :value="null">-- Non assigné --</option>
                                     <option v-for="grp in groups" :key="grp.id" :value="grp.id">{{ grp.name }}</option>
                                 </select>
@@ -57,11 +58,12 @@
                         <div class="input-grid">
                             <div class="field">
                                 <label>Niveau d'appétence (1-4)</label>
-                                <input type="number" v-model="form.appetence_level" min="1" max="4">
+                                <input class="form-control" type="number" v-model="form.appetence_level" min="1"
+                                    max="4">
                             </div>
                             <div class="field">
                                 <label>Bibliothèque à domicile ?</label>
-                                <select v-model="form.has_library">
+                                <select class="form-control" v-model="form.has_library">
                                     <option value="">-- Sélectionner --</option>
                                     <option v-for="val in (Object.values(Library) as string[])" :key="val" :value="val">
                                         {{ val }}</option>
@@ -69,7 +71,7 @@
                             </div>
                             <div class="field full">
                                 <label>Support favori</label>
-                                <select v-model="form.reading_support">
+                                <select class="form-control" v-model="form.reading_support">
                                     <option value="">-- Sélectionner un support --</option>
                                     <option v-for="val in (Object.values(ReadingSupport) as string[])" :key="val"
                                         :value="val">{{ val }}</option>
@@ -82,7 +84,8 @@
                             <div class="selection-grid">
                                 <label v-for="work in readingWorksOptions" :key="work" class="pill"
                                     :class="{ active: selectedReadingWorks.includes(work) }">
-                                    <input type="checkbox" :value="work" v-model="selectedReadingWorks">
+                                    <input class="form-control" type="checkbox" :value="work"
+                                        v-model="selectedReadingWorks">
                                     <span>{{ work }}</span>
                                 </label>
                             </div>
@@ -93,7 +96,8 @@
                             <div class="selection-grid">
                                 <label v-for="motive in motiveOptions" :key="motive" class="pill"
                                     :class="{ active: selectedMotives.includes(motive) }">
-                                    <input type="checkbox" :value="motive" v-model="selectedMotives">
+                                    <input class="form-control" type="checkbox" :value="motive"
+                                        v-model="selectedMotives">
                                     <span>{{ motive }}</span>
                                 </label>
                             </div>
@@ -105,7 +109,8 @@
                             </div>
                             <div class="segment-container">
                                 <label v-for="level in declaredLevelOptions" :key="level" class="segment">
-                                    <input type="radio" :value="level" v-model="form.declared_level">
+                                    <input class="form-control" type="radio" :value="level"
+                                        v-model="form.declared_level">
                                     <div class="segment-box">{{ level }}</div>
                                 </label>
                             </div>
@@ -121,7 +126,7 @@
                                 <div class="badge">Parent {{ p }}</div>
                                 <div class="field">
                                     <label>Diplôme</label>
-                                    <select v-model="form[`parent_${p}_degree` as keyof Student]">
+                                    <select class="form-control" v-model="form[`parent_${p}_degree` as keyof Student]">
                                         <option value="">-- Sélectionner --</option>
                                         <option v-for="v in (Object.values(Degree) as string[])" :key="v" :value="v">
                                             {{ v }}</option>
@@ -129,10 +134,10 @@
                                 </div>
                                 <div class="field">
                                     <label>CSP</label>
-                                    <select v-model="form[`parent_${p}_csp` as keyof Student]">
+                                    <select class="form-control" v-model="form[`parent_${p}_csp` as keyof Student]">
                                         <option value="">-- Sélectionner --</option>
                                         <option v-for="v in (Object.values(CSP) as string[])" :key="v" :value="v">{{ v
-                                        }}
+                                            }}
                                         </option>
                                     </select>
                                 </div>
@@ -210,17 +215,9 @@ const handleSave = () => {
 </script>
 
 <style scoped>
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.7);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-    backdrop-filter: blur(8px);
-}
-
+/* ==========================================================================
+     STYLE MODAL.
+     ========================================================================== */
 .modal-container {
     background: #f8fafc;
     border-radius: 24px;
@@ -298,6 +295,9 @@ const handleSave = () => {
     gap: 24px;
 }
 
+/* ==========================================================================
+     CARTES.
+     ========================================================================== */
 .content-card {
     background: white;
     border-radius: 16px;
@@ -317,6 +317,9 @@ const handleSave = () => {
     margin-bottom: 20px;
 }
 
+/* ==========================================================================
+     PILL.
+     ========================================================================== */
 .pill {
     display: flex;
     align-items: center;
@@ -357,6 +360,9 @@ const handleSave = () => {
     color: #0d9488;
 }
 
+/* ==========================================================================
+     INPUTS.
+     ========================================================================== */
 .input-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -473,6 +479,9 @@ select {
     gap: 12px;
 }
 
+/* ==========================================================================
+     BOUTONS.
+     ========================================================================== */
 .btn-text {
     background: transparent;
     border: none;
@@ -500,6 +509,9 @@ select {
     transform: translateY(-1px);
 }
 
+/* ==========================================================================
+     TRANSITIONS.
+     ========================================================================== */
 .modal-scale-enter-active,
 .modal-scale-leave-active {
     transition: all 0.3s ease;

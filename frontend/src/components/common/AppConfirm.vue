@@ -33,17 +33,9 @@ defineEmits(['resolve']);
 </script>
 
 <style scoped>
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.7);
-    backdrop-filter: blur(4px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 10000;
-}
-
+/* ==========================================================================
+   STYLE MODAL.
+   ========================================================================== */
 .confirm-modal {
     background: white;
     width: 100%;
@@ -93,6 +85,9 @@ defineEmits(['resolve']);
     padding: 12px;
 }
 
+/* ==========================================================================
+   TRANSITION.
+   ========================================================================== */
 .fade-enter-active,
 .fade-leave-active {
     transition: opacity 0.3s;

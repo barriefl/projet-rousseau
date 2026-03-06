@@ -1,6 +1,6 @@
 <template>
   <div class="emile-regles">
-    <div class="header">
+    <div class="page-header">
       <h1>Catégories & Règles</h1>
       <button class="btn btn-primary" @click="recalculateGlobal" :disabled="isSavingRules">
         <Loader2 v-if="isSavingRules" :size="18" class="animate-spin" />
@@ -205,74 +205,26 @@ const saveCategory = async () => {
 </script>
 
 <style scoped>
-/* CSS de base. */
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+/* ==========================================================================
+   STYLE DU BOUTON POUR CALCULER LES NOTES.
+   ========================================================================== */
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
 
-.header h1 {
-  font-size: 1.6rem;
-  color: var(--primary);
-  margin: 0;
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.btn {
-  padding: 8px 16px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: 0.2s;
-  border: none;
-}
-
-.btn-primary {
-  background: var(--accent);
-  color: white;
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid #ccc;
-  color: var(--text);
-}
-
-/* Modification du layout. */
-.workspace-layout {
-  display: block;
-}
-
-/* Empty State. */
-.empty-state {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 400px;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e1e8ed;
-}
-
-.empty-content {
-  text-align: center;
-  color: #7f8c8d;
-}
-
-.empty-icon {
-  display: block;
-  font-size: 3rem;
-  margin-bottom: 15px;
-  opacity: 0.5;
-}
-
-.empty-content p {
-  margin-bottom: 20px;
-  font-size: 1.1rem;
-}
-
-/* Styles des catégories. */
+/* ==========================================================================
+   STYLE DES CATÉGORIES.
+   ========================================================================== */
 .categories-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -356,20 +308,6 @@ const saveCategory = async () => {
   white-space: nowrap;
 }
 
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .edit-icon-svg {
   cursor: pointer;
   color: var(--primary);
@@ -383,18 +321,16 @@ const saveCategory = async () => {
   transform: scale(1.1);
 }
 
-.btn:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-  transform: none !important;
-}
-
 .category-body {
   padding: 15px;
   flex: 1;
   overflow-y: auto;
   background: #fafafa;
 }
+
+/* ==========================================================================
+   STYLE DES RÈGLES.
+   ========================================================================== */
 
 .rule-item {
   background: white;
@@ -423,7 +359,9 @@ const saveCategory = async () => {
   line-height: 1.3;
 }
 
-/* Switch CSS. */
+/* ==========================================================================
+   SWITCH.
+   ========================================================================== */
 .switch {
   position: relative;
   display: inline-block;
@@ -471,40 +409,9 @@ input:checked+.slider:before {
   transform: translateX(16px);
 }
 
-/* Modal CSS. */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  z-index: 1000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.modal {
-  background: white;
-  padding: 30px;
-  border-radius: 8px;
-  width: 550px;
-  max-width: 90%;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-}
-
-.form-group {
-  margin-bottom: 15px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-
+/* ==========================================================================
+   FORMULAIRE POUR MODIFIER UNE CATÉGORIE.
+   ========================================================================== */
 .form-group input,
 .form-group select,
 .form-group textarea {

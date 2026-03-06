@@ -1,6 +1,6 @@
 <template>
   <div class="import-view">
-    <div class="header">
+    <div class="page-header">
       <button class="btn btn-outline" @click="router.push('/gestion')">← Retour</button>
       <h1>Importation de Dictées</h1>
     </div>
@@ -500,33 +500,15 @@ const submitAll = async () => {
 </script>
 
 <style scoped>
-.header {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
-.header h1 {
-  font-size: 1.6rem;
-  color: var(--primary);
-  margin: 0;
-}
-
+/* ==========================================================================
+   STYLE DE LA PAGE.
+   ========================================================================== */
 .form-card {
   background: white;
   padding: 30px;
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   border: 1px solid #e1e8ed;
-}
-
-.grid-3 {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  padding-bottom: 20px;
-  border-bottom: 2px solid #f0f2f5;
 }
 
 .form-group label {
@@ -554,7 +536,9 @@ const submitAll = async () => {
   cursor: not-allowed;
 }
 
-/* Upload Zone. */
+/* ==========================================================================
+   ZONE D'UPLOAD.
+   ========================================================================== */
 .upload-zone {
   border: 2px dashed #bdc3c7;
   border-radius: 8px;
@@ -577,14 +561,6 @@ const submitAll = async () => {
   opacity: 0.6;
 }
 
-.upload-zone i {
-  font-size: 3rem;
-  color: #bdc3c7;
-  display: block;
-  margin-bottom: 10px;
-  font-style: normal;
-}
-
 .upload-zone h3 {
   color: var(--primary);
   margin-bottom: 5px;
@@ -595,6 +571,22 @@ const submitAll = async () => {
   font-size: 0.9rem;
 }
 
+.upload-icon {
+  color: var(--primary);
+  opacity: 0.5;
+  margin-bottom: 15px;
+}
+
+.drag-over .upload-icon {
+  color: var(--accent);
+  opacity: 1;
+  transform: scale(1.1);
+  transition: 0.3s;
+}
+
+/* ==========================================================================
+   LISTE DES FICHIERS.
+   ========================================================================== */
 .files-list {
   margin-top: 30px;
   background: #fafafa;
@@ -687,18 +679,12 @@ const submitAll = async () => {
   border-radius: 4px;
 }
 
+/* ==========================================================================
+   BOUTONS.
+   ========================================================================== */
 .btn-group {
   display: flex;
   gap: 5px;
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  border: none;
-  transition: 0.2s;
 }
 
 .btn-sm {
@@ -758,7 +744,6 @@ const submitAll = async () => {
   font-weight: bold;
 }
 
-/* Overwrite. */
 .action-content {
   display: flex;
   flex-direction: column;
@@ -784,21 +769,6 @@ const submitAll = async () => {
   border: 1px dashed #fde68a;
 }
 
-/* Icône dans la zone d'upload */
-.upload-icon {
-  color: var(--primary);
-  opacity: 0.5;
-  margin-bottom: 15px;
-}
-
-.drag-over .upload-icon {
-  color: var(--accent);
-  opacity: 1;
-  transform: scale(1.1);
-  transition: 0.3s;
-}
-
-/* Alignement dans les bandeaux d'action */
 .file-action {
   display: flex;
   align-items: center;
@@ -841,7 +811,9 @@ const submitAll = async () => {
   font-style: italic;
 }
 
-/* Style pour le bouton principal d'envoi */
+/* ==========================================================================
+   BOUTON PRINCIPAL D'ENVOI.
+   ========================================================================== */
 .btn-large {
   padding: 15px 30px;
   font-size: 1.1rem;
@@ -856,7 +828,9 @@ const submitAll = async () => {
   box-shadow: 0 6px 12px rgba(26, 188, 156, 0.3);
 }
 
-/* --- BARRE DE PROGRESSION--- */
+/* ==========================================================================
+   BARRE DE PROGRESSION.
+   ========================================================================== */
 .progress-container {
   width: 100%;
   margin-top: 15px;

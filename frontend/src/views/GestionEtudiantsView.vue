@@ -1,16 +1,16 @@
 <template>
   <div class="gestion-etudiants-view">
-    <div class="header">
+    <div class="page-header">
       <h1>Gestion des Étudiants</h1>
     </div>
 
     <div class="tabs-nav">
-      <button class="tab-btn btn-with-icon" :class="{ active: activeTab === 'promotions' }"
+      <button class="btn tab-btn btn-with-icon" :class="{ active: activeTab === 'promotions' }"
         @click="activeTab = 'promotions'">
         <GraduationCap :size="18" />
         <span>Promotions</span>
       </button>
-      <button class="tab-btn btn-with-icon" :class="{ active: activeTab === 'groupes' }" @click="activeTab = 'groupes'">
+      <button class="btn tab-btn btn-with-icon" :class="{ active: activeTab === 'groupes' }" @click="activeTab = 'groupes'">
         <Users :size="18" />
         <span>Groupes</span>
       </button>
@@ -40,11 +40,11 @@
             <td><strong>{{ promo.name }}</strong></td>
             <td style="text-align: right;">
               <div class="action-buttons">
-                <button class="btn-outline btn-sm btn-with-icon" @click="openModal('promo', promo)">
+                <button class="btn btn-outline btn-sm btn-with-icon" @click="openModal('promo', promo)">
                   <Pencil :size="14" />
                   <span>Modifier</span>
                 </button>
-                <button class="btn-danger btn-sm btn-with-icon" @click="deleteItem('promo', promo)">
+                <button class="btn btn-danger btn-sm btn-with-icon" @click="deleteItem('promo', promo)">
                   <Trash2 :size="14" />
                   <span>Supprimer</span>
                 </button>
@@ -81,11 +81,11 @@
             <td style="color: #555; font-size: 0.9rem;">{{ groupe.description || '-' }}</td>
             <td style="text-align: right;">
               <div class="action-buttons">
-                <button class="btn-outline btn-sm btn-with-icon" @click="openModal('groupe', groupe)">
+                <button class="btn btn-outline btn-sm btn-with-icon" @click="openModal('groupe', groupe)">
                   <Pencil :size="14" />
                   <span>Modifier</span>
                 </button>
-                <button class="btn-danger btn-sm btn-with-icon" @click="deleteItem('groupe', groupe)">
+                <button class="btn btn-danger btn-sm btn-with-icon" @click="deleteItem('groupe', groupe)">
                   <Trash2 :size="14" />
                   <span>Supprimer</span>
                 </button>
@@ -250,17 +250,9 @@ const deleteItem = async (type: 'promo' | 'groupe', item: Promotion | Group) => 
 </script>
 
 <style scoped>
-.header {
-  margin-bottom: 20px;
-}
-
-.header h1 {
-  font-size: 1.6rem;
-  color: var(--primary);
-  margin: 0;
-}
-
-/* --- SYSTÈME D'ONGLETS. --- */
+/* ==========================================================================
+   ONGLETS.
+   ========================================================================== */
 .tabs-nav {
   display: flex;
   gap: 10px;
@@ -335,7 +327,9 @@ const deleteItem = async (type: 'promo' | 'groupe', item: Promotion | Group) => 
   margin: 0;
 }
 
-/* --- TABLEAUX. --- */
+/* ==========================================================================
+   TABLEAUX.
+   ========================================================================== */
 table {
   width: 100%;
   border-collapse: collapse;
@@ -364,14 +358,10 @@ tr:hover {
   background-color: #fcfcfc;
 }
 
-.empty-state {
-  text-align: center;
-  color: #7f8c8d;
-  padding: 30px;
-  font-style: italic;
-}
 
-/* --- BOUTONS. --- */
+/* ==========================================================================
+   BOUTONS.
+   ========================================================================== */
 .action-buttons {
   display: flex;
   justify-content: flex-end;
@@ -381,38 +371,6 @@ tr:hover {
 .btn-sm {
   padding: 4px 10px;
   font-size: 0.85rem;
-}
-
-.btn-with-icon {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.btn-danger:hover {
-  background-color: #c0392b;
-  box-shadow: 0 2px 4px rgba(231, 76, 60, 0.2);
-}
-
-.btn-primary {
-  background: var(--accent);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: 0.2s;
-  font-weight: 500;
-  padding: 8px 16px;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #12876f;
-  transform: translateY(-1px);
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .btn-danger {
@@ -432,49 +390,9 @@ tr:hover {
   transform: scale(1.05);
 }
 
-.btn-outline {
-  background: transparent;
-  border: 1px solid #ccc;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-
-.btn-outline:hover {
-  background: #eee;
-}
-
-/* --- MODALES. --- */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  z-index: 1000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.modal {
-  background: white;
-  padding: 30px;
-  border-radius: 8px;
-  width: 450px;
-  max-width: 90%;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: 500;
-  font-size: 0.9rem;
-}
-
+/* ==========================================================================
+   FORMULAIRE DE MODIFICATION.
+   ========================================================================== */
 .form-group input,
 .form-group textarea {
   width: 100%;
@@ -490,21 +408,5 @@ tr:hover {
 .form-group textarea:focus {
   border-color: var(--accent);
   outline: none;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.confirm-modal {
-  width: 400px;
-  text-align: center;
-}
-
-.confirm-modal .modal-actions {
-  justify-content: center;
-  margin-top: 30px;
 }
 </style>
