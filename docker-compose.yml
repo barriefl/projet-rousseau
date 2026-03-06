@@ -35,14 +35,36 @@ services:
     image: dpage/pgadmin4
     container_name: rousseau_pgadmin
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@rousseau.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
     ports:
       - "5050:80"
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - rousseau_net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  languagetool:
+    image: meyay/languagetool
+    container_name: rousseau-languagetool
+    restart: unless-stopped
+    ports:
+      - "8010:8081"
+    environment:
+      - Java_Xms=256m
+      - Java_Xmx=512m
+      - JAVA_TOOL_OPTIONS=-Djava.net.preferIPv4Stack=true
+    volumes:
+      - languagetool_fasttext:/fasttext
     networks:
       - rousseau_net
     logging:
@@ -67,9 +89,12 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - DATA_DIR=/data
+      - LANGUAGETOOL_URL=http://languagetool:8081
     depends_on:
       db:
         condition: service_healthy
+      languagetool:
+        condition: service_started
     networks:
       - rousseau_net
     logging:
@@ -82,30 +107,27 @@ services:
         limits:
           cpus: '0.5'
           memory: 512M
-  
-  languagetool:
-    image: meyay/languagetool
-    container_name: rousseau-languagetool
-    ports:
-      - "8010:8081"
-    environment:
-      - Java_Xms=256m
-      - Java_Xmx=512m
-      - JAVA_TOOL_OPTIONS=-Djava.net.preferIPv4Stack=true
 
   frontend:
     build:
       context: ./frontend
     container_name: rousseau_frontend
+    restart: unless-stopped
     ports:
       - "8080:80"
     depends_on:
       - backend
     networks:
       - rousseau_net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   postgres_data:
+  languagetool_fasttext:
 
 networks:
   rousseau_net:
