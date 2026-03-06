@@ -1,58 +1,188 @@
 # Projet Rousseau
 
+![Vue.js](https://img.shields.io/badge/Vue.js-35495E?style=for-the-badge&logo=vuedotjs&logoColor=4FC08D)
+![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
+
+## Sommaire
+- [Contexte](#contexte)
+- [Prérequis](#prérequis)
+- [Stack Technique](#stack-technique)
+- [Développement](#développement)
+  - [Configuration (.env)](#configuration-variables-denvironnement)
+  - [Méthode 1 : Lancement Complet (Docker)](#méthode-1--lancement-complet-avec-docker)
+  - [Méthode 2 : Développement Local (Hot-Reload)](#méthode-2--développement-local-hot-reload)
+- [Accès aux services](#accès-aux-services-docker)
+- [Scripts Utilitaires](#scripts-utilitaires-backend)
+- [Structure du Projet](#structure-du-projet)
+- [Tests](#tests)
+
 ## Contexte
+
+Le Projet ROUSSEAU, mené à l'IUT d'Annecy auprès des étudiants de première année de BUT, naît du constat que la maîtrise de l'orthographe est indispensable à la réussite académique et professionnelle, mais que les dispositifs de remédiation actuels montrent leurs limites. Dans une démarche critique vis-à-vis du dressage mécanique du Projet Voltaire utilisé précédemment, l'étude introduit pour l'année 2024-2025 la plateforme universitaire gratuite Ecri+, privilégiant une approche par compétences centrée sur l'apprenant. Ce pivot stratégique répond également à une contrainte budgétaire forte : il vise à déterminer si une solution ouverte et gratuite peut remplacer efficacement une solution privée représentant un coût annuel d'environ 10 000 € pour l'établissement.
+
+Les enjeux de cette expérimentation dépassent la simple comparaison d'outils pour interroger profondément la stratégie pédagogique de l'établissement. Il s'agit d'abord de vérifier si les progrès constatés dans les exercices se transfèrent réellement à l'écrit spontané, un fossé souvent observé chez les étudiants. Sur le plan économique, l'étude doit déterminer si la solution gratuite offre une efficacité comparable à la licence payante, ce qui permettrait une rationalisation budgétaire. Enfin, en analysant le poids des déterminismes socioculturels (habitudes de lecture, milieu familial) face à la remédiation tardive, le projet pourrait conduire l'institution à repenser sa mission : si les inégalités structurelles s'avèrent trop lourdes, l'université pourrait devoir renoncer à « réparer » l'orthographe pour se tourner vers des outils palliatifs comme l'IA.
+
+## Prérequis
+
+Assurez-vous d'avoir installé les outils suivants sur votre machine :
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) pour la virtualisation.
+- [Python 3.13+](https://www.python.org/downloads/) pour le développement backend.
+- [Node.js 22+](https://nodejs.org/) & npm pour le développement frontend.
+- [Git](https://git-scm.com/install/).
+
+## Stack Technique
+
+- **Backend :** Python, FastAPI, SQLModel (PostgreSQL).
+- **Frontend :** Vue.js 3, TypeScript, Vite, Chart.js
+- **Services tiers :** LanguageTool (Correction orthographique), pgAdmin (Gestion BDD).
+- **Infrastructure :** Docker & Docker Compose.
 
 ## Développement
 
-### Environnement Virtuel
+### Configuration (Variables d'environnement)
 
-1. Se placer dans le bon dossier
-`cd backend`
+Avant de lancer le projet, vous devez créer un fichier `.env` à la racine du projet. 
+Vous pouvez vous baser sur un hypothétique fichier `.env.example` :
 
-2. Créer l'environnement virtuel
-`python -m venv venv`
+```env
+# Base de données PostgreSQL
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=secretpassword
+POSTGRES_DB=rousseau_db
 
-3. Activer l'environnement
-- Sur Windows (PowerShell)
-`.\venv\Scripts\Activate`
-- Sur Mac / Linux
-`source venv/bin/activate`
+# pgAdmin
+PGADMIN_EMAIL=admin@rousseau.com
+PGADMIN_PASSWORD=admin
 
-### Installer les dépendances
+SECRET_KEY=secretkey
 
-`pip install -r requirements.txt`
+DATABASE_URL=postgresql://admin:secretpassword@localhost:5434/rousseau_db
 
-### Virtualisation
+# Sécurité Backend
+# Générer avec python : "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+ENCRYPTION_KEY=VotreCleFernetIci
+```
 
-`docker-compose up -d --build`
+### Méthode 1 : Lancement Complet avec Docker
+
+Idéal pour tester l'application ou la déployer rapidement.
+
+Cette commande lance absolument tout (Base de données, pgAdmin, LanguageTool, Backend et Frontend) dans des conteneurs isolés :
+- ```docker compose up -d --build```
+
+### Méthode 2 : Développement Local (Hot-Reload)
+
+Idéal pour travailler sur le code. Le backend et le frontend se rechargeront automatiquement à chaque modification de fichier.
+
+1. Lancer l'infrastructure Docker
+Nous n'avons besoin que de la base de données, de pgAdmin et de LanguageTool. Lancez uniquement ces services :
+```docker compose up -d db pgadmin languagetool```
+
+2. Démarrer le Backend FastAPI
+    1. Se placer dans le bon dossier
+    `cd backend`
+
+    2. Créer l'environnement virtuel
+    `python -m venv venv`
+
+    3. Activer l'environnement
+        - Sur Windows (PowerShell)
+        `.\venv\Scripts\Activate`
+        - Sur Mac / Linux
+        `source venv/bin/activate`
+
+    4. Installer les dépendances
+    `pip install -r requirements.txt`
+
+    5. Lancer le serveur avec rechargement automatique
+    `uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload`
+
+3. Démarrer le Frontend Vue.js
+    1. Se placer dans le dossier frontend :
+    `cd frontend`
+
+    2. Installer les dépendances Node :
+    `npm install`
+
+    3. Lancer le serveur de développement Vite :
+    `npm run dev`
+
+## Accès aux services (Docker)
+
+Une fois les conteneurs lancés via `docker-compose up -d`, les services sont accessibles aux adresses suivantes :
+
+| Service | URL | Description |
+|---|---|---|
+| **Frontend** | `http://localhost:8080` | L'interface web de l'application |
+| **Backend API** | `http://localhost:8000` | L'API racine |
+| **API Docs (Swagger)** | `http://localhost:8000/docs` | Documentation interactive de l'API (FastAPI) |
+| **pgAdmin** | `http://localhost:5050` | Interface d'administration de la base de données |
+| **LanguageTool** | `http://localhost:8010/v2/info` | API de correction orthographique |
+| **Base de données** | `localhost:5434` | Port exposé pour connexion locale (DBeaver, DataGrip...) |
+
+## Scripts Utilitaires (Backend)
 
 #### Script de Seed
 
 - Pour un import standard (si la base est vide).
-`docker-compose exec backend python -m app.seed`
+`docker-compose exec backend python -m app.scripts.seed`
 
 - Pour écraser et tout remettre à propre (reset).
-`docker-compose exec backend python -m app.seed --reset-db`
+`docker-compose exec backend python -m app.scripts.seed --reset-db`
 
 - Pour tester (simulation).
-`docker-compose exec backend python -m app.seed --dry-run`
+`docker-compose exec backend python -m app.scripts.seed --dry-run`
 
 #### Script Check Names
 
 - Permet de vérifier la différence entre le nom de la dictée et le nom de l'étudiant.
-`docker-compose exec backend python -m app.check_names`
+`docker-compose exec backend python -m app.scripts.check_names`
 
 #### Script Fix Files
 
 - Permet de corréler les noms de fichiers similaires (dictée et étudiant).
-`docker-compose exec backend python -m app.fix_files`
+`docker-compose exec backend python -m app.scripts.fix_files`
 
 #### Script Check Mapping
 
 - Permet de voir si les étudiants matchent entre les différents CSV.
-`docker-compose exec backend python -m app.check_mapping`
+`docker-compose exec backend python -m app.scripts.check_mapping`
 
 #### Script Check Status
 
 - Permet de voir l'avancée de chaque étudiant niveau des dictées et résultats outils.
-`docker-compose exec backend python -m app.check_status`
+`docker-compose exec backend python -m app.scripts.check_status`
+
+#### Script Reset Database
+
+- Permet de réinitialiser la base de données.
+`docker-compose exec backend python -m app.scripts.reset_db`
+
+#### Script Sync Enum
+
+- Permet de générer un fichier `generated_enums.ts` dans `/frontend/src/types`, afin d'avoir des Enums synchronisés entre le Backend et le Frontend.
+`docker-compose exec backend python -m app.scripts.sync_enum`
+
+## Structure du Projet
+
+```text
+projet-rousseau/
+├── backend/            # Code source de l'API (FastAPI).
+│   ├── app/            # Logique métier, endpoints, modèles, services.
+│   └── data/           # Fichiers bruts (CSV, copies) pour l'import.
+├── frontend/           # Code source de l'interface (Vue 3 / TypeScript).
+│   ├── src/views/      # Vues (Tableaux de bord, corrections, etc.).
+│   └── src/components/ # Composants UI réutilisables.
+├── docker-compose.yml  # Orchestration des services.
+└── .env                # Fichier de configuration.
+```
+
+## Tests
+
+Le projet inclut des tests unitaires et de bout en bout (E2E) pour le frontend.
+
+1. Se placer dans le dossier frontend : `cd frontend`
+2. Lancer les tests unitaires (Vitest) : `npm run test:unit`
+3. Lancer les tests E2E (Playwright) : `npm run test:e2e`
