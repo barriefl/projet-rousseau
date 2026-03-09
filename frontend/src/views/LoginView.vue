@@ -7,9 +7,15 @@
             </p>
 
             <form @submit.prevent="handleLogin">
-                <div class="form-group">
-                    <input v-model="password" type="password" class="form-control" placeholder="Mot de passe" required
-                        autofocus />
+                <div class="form-group" style="position: relative;">
+                    <input v-model="password" :type="showPassword ? 'text' : 'password'" class="form-control"
+                        placeholder="Mot de passe" required autofocus style="padding-right: 40px;" />
+                    <button type="button" @click="showPassword = !showPassword"
+                        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-light, #6b7280); display: flex; align-items: center; justify-content: center; padding: 5px;"
+                        title="Afficher/Masquer le mot de passe">
+                        <EyeOff v-if="showPassword" :size="20" />
+                        <Eye v-else :size="20" />
+                    </button>
                 </div>
 
                 <button type="submit" class="btn btn-primary"
@@ -27,8 +33,10 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useUiStore } from '@/stores/ui'
+import { Eye, EyeOff } from 'lucide-vue-next'
 
 const password = ref('')
+const showPassword = ref(false)
 const isLoading = ref(false)
 const router = useRouter()
 const ui = useUiStore()

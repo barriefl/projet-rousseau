@@ -23,6 +23,9 @@ import ReferenceDicteeView from '@/views/ReferenceDicteeView.vue'
 // PAGE DE LOGIN.
 import LoginView from '@/views/LoginView.vue'
 
+// PAGE NOT FOUND.
+import NotFound from '@/views/NotFoundView.vue'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -92,6 +95,12 @@ const router = createRouter({
       name: 'gestion-etudiants',
       component: GestionEtudiantsView,
     },
+    {
+      path: '/:pathMatch(.*)*', 
+      name: 'not-found',
+      component: NotFound,
+      meta: { requiresAuth: false }
+    }
   ],
 })
 
