@@ -1,8 +1,24 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from app.database import init_db
+
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.endpoints import stats_endpoint, submissions_endpoint, students_endpoint, dictations_endpoint, categories_endpoint, rules_endpoint, promotions_endpoint, groups_endpoint, import_endpoint, assessment_import_endpoint
+
+from app.database import init_db
+from app.endpoints import (
+    assessment_import_endpoint,
+    auth_endpoint,
+    categories_endpoint,
+    dictations_endpoint,
+    groups_endpoint,
+    import_endpoint,
+    promotions_endpoint,
+    rules_endpoint,
+    stats_endpoint,
+    students_endpoint,
+    submissions_endpoint,
+)
+from app.utils.auth import verify_token
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -10,16 +26,17 @@ async def lifespan(app: FastAPI):
     print("Database initialized.")
     yield
 
+
 app = FastAPI(
     title="Projet Rousseau",
     version="1.0.0",
     description="API for Projet Rousseau application.",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 origins = [
-    "http://localhost:5173",    # Front-End.
-    "http://localhost:8080",    # Autre port fréquent.
+    "http://localhost:5173",  # Front-End.
+    "http://localhost:8080",  # Autre port fréquent.
     "http://127.0.0.1:5173",
 ]
 
@@ -31,24 +48,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the Projet Rousseau API!"}
+
 
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
 
 
-app.include_router(promotions_endpoint.router, prefix="/api")
-app.include_router(groups_endpoint.router, prefix="/api")
+app.include_router(auth_endpoint.router, prefix="/api")
+app.include_router(
+    promotions_endpoint.router, prefix="/api", dependencies=[Depends(verify_token)]
+)
+app.include_router(
+    groups_endpoint.router, prefix="/api", dependencies=[Depends(verify_token)]
+)
+app.include_router(
+    import_endpoint.router, prefix="/api", dependencies=[Depends(verify_token)]
+)
+app.include_router(
+    assessment_import_endpoint.router,
+    prefix="/api",
+    dependencies=[Depends(verify_token)],
+)
 
-app.include_router(import_endpoint.router, prefix="/api")
-app.include_router(assessment_import_endpoint.router, prefix="/api")
-
-app.include_router(stats_endpoint.router, prefix="/api/stats", tags=["Stats"])
-app.include_router(submissions_endpoint.router, prefix="/api/submissions", tags=["Submissions"])
-app.include_router(students_endpoint.router, prefix="/api/students", tags=["Students"])
-app.include_router(dictations_endpoint.router, prefix="/api/dictations", tags=["Dictations"])
-app.include_router(categories_endpoint.router, prefix="/api")
-app.include_router(rules_endpoint.router, prefix="/api/rules", tags=["Rules"])
+app.include_router(
+    stats_endpoint.router,
+    prefix="/api/stats",
+    tags=["Stats"],
+    dependencies=[Depends(verify_token)],
+)
+app.include_router(
+    submissions_endpoint.router,
+    prefix="/api/submissions",
+    tags=["Submissions"],
+    dependencies=[Depends(verify_token)],
+)
+app.include_router(
+    students_endpoint.router,
+    prefix="/api/students",
+    tags=["Students"],
+    dependencies=[Depends(verify_token)],
+)
+app.include_router(
+    dictations_endpoint.router,
+    prefix="/api/dictations",
+    tags=["Dictations"],
+    dependencies=[Depends(verify_token)],
+)
+app.include_router(
+    categories_endpoint.router, prefix="/api", dependencies=[Depends(verify_token)]
+)
+app.include_router(
+    rules_endpoint.router,
+    prefix="/api/rules",
+    tags=["Rules"],
+    dependencies=[Depends(verify_token)],
+)

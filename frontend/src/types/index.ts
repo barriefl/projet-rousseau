@@ -1,5 +1,11 @@
 import type { AssessmentType, MistakeType, Platform } from './generated_enums'
 
+// --- TYPE POUR AUTH. ---
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+}
+
 // --- TYPES POUR PROMOTIONS. ---
 export interface Promotion {
   id: number

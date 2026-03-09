@@ -20,70 +20,91 @@ import CorrectionView from '@/views/CorrectionView.vue'
 import ImportDicteeView from '@/views/ImportDicteeView.vue'
 import ReferenceDicteeView from '@/views/ReferenceDicteeView.vue'
 
+// PAGE DE LOGIN.
+import LoginView from '@/views/LoginView.vue'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
+      path: '/login',
+      name: 'login',
+      component: LoginView,
+      meta: { requiresAuth: false },
+    },
+    {
       path: '/',
       name: 'dashboard',
-      component: DashboardView
+      component: DashboardView,
     },
     {
       path: '/import-etude',
       name: 'import-etude',
-      component: ImportEtudeView
+      component: ImportEtudeView,
     },
     {
       path: '/import-resultats',
       name: 'import-resultats',
-      component: ImportResultats
+      component: ImportResultats,
     },
     {
       path: '/emile',
       name: 'emile-dashboard',
-      component: EmileDashboardView
+      component: EmileDashboardView,
     },
     {
       path: '/gestion',
       name: 'gestion',
-      component: EmileGestionView
+      component: EmileGestionView,
     },
     {
       path: '/correction',
       name: 'correction',
-      component: CorrectionView
+      component: CorrectionView,
     },
     {
       path: '/import-dictee',
       name: 'import-dictee',
-      component: ImportDicteeView
+      component: ImportDicteeView,
     },
     {
       path: '/dictee-referente',
       name: 'dictee-referente',
-      component: ReferenceDicteeView
+      component: ReferenceDicteeView,
     },
     {
       path: '/analyse',
       name: 'analyse',
-      component: EmileAnalyseView
+      component: EmileAnalyseView,
     },
     {
       path: '/regles',
       name: 'regles',
-      component: EmileReglesView
+      component: EmileReglesView,
     },
     {
       path: '/etudiants',
       name: 'etudiants',
-      component: EtudiantsView
+      component: EtudiantsView,
     },
     {
       path: '/gestion-etudiants',
       name: 'gestion-etudiants',
-      component: GestionEtudiantsView
-    }
+      component: GestionEtudiantsView,
+    },
   ],
+})
+
+router.beforeEach((to, from, next) => {
+  const isAuthenticated = !!localStorage.getItem('access_token')
+
+  if (to.name !== 'login' && !isAuthenticated) {
+    next({ name: 'login' })
+  } else if (to.name === 'login' && isAuthenticated) {
+    next({ name: 'dashboard' })
+  } else {
+    next()
+  }
 })
 
 export default router

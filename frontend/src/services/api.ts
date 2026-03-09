@@ -26,6 +26,7 @@ import type {
   SubmissionDetails,
   StudentWithScores,
   EmileStatsResponse,
+  AuthResponse,
 } from '@/types'
 import type { AssessmentType, Platform } from '@/types/generated_enums'
 import { useUiStore } from '@/stores/ui'
@@ -35,6 +36,14 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+})
+
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 apiClient.interceptors.response.use(
@@ -53,6 +62,15 @@ apiClient.interceptors.response.use(
         case 400:
           ui.notify(`Données invalides : ${message}`, 'error')
           break
+        case 401:
+          localStorage.removeItem('access_token')
+
+          if (window.location.pathname !== '/login') {
+            ui.notify('Votre session a expiré, veuillez vous reconnecter.', 'error')
+            window.location.href = '/login'
+          }
+
+          break
         case 500:
           ui.notify('Erreur interne du serveur (500).', 'error')
           break
@@ -68,6 +86,27 @@ apiClient.interceptors.response.use(
 type ApiData<T> = Promise<T>
 
 export default {
+  // ==========================================
+  // --- AUTH ---
+  // ==========================================
+  /**
+   * Authentifie l'utilisateur et récupère un jeton d'accès (Token JWT).
+   * Cette route respecte le standard OAuth2PasswordRequestForm attendu par FastAPI.
+   * * @param {string} password - Le mot de passe administrateur (défini dans le .env du backend).
+   * @returns {Promise<AuthResponse>} Un objet contenant le token JWT et son type (Bearer).
+   * @throws {AxiosError} En cas d'échec (ex: 401 Unauthorized), l'erreur est propagée pour être gérée par le composant ou l'intercepteur.
+   */
+  async login(password: string): ApiData<AuthResponse> {
+    const formData = new URLSearchParams()
+    formData.append('username', 'user')
+    formData.append('password', password)
+
+    const response = await apiClient.post<AuthResponse>('/auth/login', formData, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    })
+    return response.data
+  },
+
   // ==========================================
   // --- PROMOTIONS ---
   // ==========================================
