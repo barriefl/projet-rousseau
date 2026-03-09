@@ -11,6 +11,10 @@
 
     <AppLoading v-if="isLoadingStudents" message="Chargement des étudiants..." />
 
+    <AppEmptyState v-else-if="students.length === 0" title="Aucun étudiant"
+      message="Impossible de charger les étudiants." :showRetry="true" :loading="isLoadingStudents"
+      @retry="fetchStudentsWithScores" />
+
     <div class="student-scroll-list" v-else>
       <div v-for="student in filteredStudents" :key="student.id" class="student-card"
         :class="{ 'selected': selectedStudent?.id === student.id }" @click="selectStudent(student)">
@@ -119,8 +123,12 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
+
 import type { Student, StudentSubmission, StudentWithScores, SubmissionDetails } from '@/types';
+
 import AppLoading from '@/components/common/AppLoading.vue';
+import AppEmptyState from '@/components/common/AppEmptyState.vue';
+
 import { useUiStore } from '@/stores/ui';
 
 const ui = useUiStore();
@@ -141,6 +149,24 @@ const submissionDetails = ref<SubmissionDetails | null>(null);
 
 const tooltip = ref({ visible: false, x: 0, y: 0, type: '', malus: '', corr: '', desc: '', ruleId: '' });
 
+// --- CHARGEMENT INITIAL. ---
+const fetchStudentsWithScores = async () => {
+  isLoadingStudents.value = true;
+  try {
+    const data = await api.getStudentsWithScores();
+    students.value = data.sort((a: Student, b: Student) => a.last_name.localeCompare(b.last_name, 'fr'));
+  } catch (error) {
+    console.error("Erreur chargement étudiants :", error);
+    ui.notify("Erreur lors de la récupération des étudiants et des scores.", "error");
+  } finally {
+    isLoadingStudents.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchStudentsWithScores();
+})
+
 // --- COMPUTED (Recherche). ---
 const filteredStudents = computed(() => {
   return students.value.filter(s =>
@@ -152,19 +178,6 @@ const filteredStudents = computed(() => {
 const sortedMistakes = computed(() => {
   if (!submissionDetails.value?.mistakes) return [];
   return [...submissionDetails.value.mistakes].sort((a, b) => a.position_index - b.position_index);
-});
-
-// --- CHARGEMENT INITIAL. ---
-onMounted(async () => {
-  try {
-    const data = await api.getStudentsWithScores();
-    students.value = data.sort((a: Student, b: Student) => a.last_name.localeCompare(b.last_name, 'fr'));
-  } catch (error) {
-    console.error("Erreur chargement étudiants :", error);
-    ui.notify("Erreur lors de la récupération des scores.", "error");
-  } finally {
-    isLoadingStudents.value = false;
-  }
 });
 
 // --- LOGIQUE DES BADGES DE SCORE. ---

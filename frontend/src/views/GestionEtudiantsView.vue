@@ -10,7 +10,8 @@
         <GraduationCap :size="18" />
         <span>Promotions</span>
       </button>
-      <button class="btn tab-btn btn-with-icon" :class="{ active: activeTab === 'groupes' }" @click="activeTab = 'groupes'">
+      <button class="btn tab-btn btn-with-icon" :class="{ active: activeTab === 'groupes' }"
+        @click="activeTab = 'groupes'">
         <Users :size="18" />
         <span>Groupes</span>
       </button>
@@ -34,7 +35,9 @@
         </thead>
         <tbody>
           <tr v-if="promotions?.length === 0">
-            <td colspan="2" class="empty-state">Aucune promotion configurée.</td>
+            <td colspan="2">
+              <AppEmptyState title="Aucune promotion" message="Impossible de charger les promotions." />
+            </td>
           </tr>
           <tr v-for="promo in promotions" :key="promo.id">
             <td><strong>{{ promo.name }}</strong></td>
@@ -74,7 +77,9 @@
         </thead>
         <tbody>
           <tr v-if="groupes?.length === 0">
-            <td colspan="3" class="empty-state">Aucun groupe configuré.</td>
+            <td colspan="3">
+              <AppEmptyState title="Aucun groupe" message="Impossible de charger les groupes." />
+            </td>
           </tr>
           <tr v-for="groupe in groupes" :key="groupe.id">
             <td><strong>{{ groupe.name }}</strong></td>
@@ -127,8 +132,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import api from '@/services/api';
+
 import type { Promotion, Group } from '@/types';
+
 import { GraduationCap, Users, Plus, Pencil, Trash2 } from 'lucide-vue-next';
+
+import AppEmptyState from '@/components/common/AppEmptyState.vue';
+
 import { useUiStore } from '@/stores/ui';
 
 const ui = useUiStore();

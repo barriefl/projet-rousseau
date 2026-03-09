@@ -41,34 +41,34 @@
         </tr>
 
         <tr v-if="students.length === 0 && !loading">
-          <AppEmptyState title="Aucun étudiant" message="Aucun étudiant dans la base de données." />
+          <td colspan="4">
+            <AppEmptyState title="Aucun étudiant" message="Impossible de charger les étudiants." :showRetry="true"
+            :loading="loading" @retry="loadData" />
+          </td>
         </tr>
       </tbody>
     </table>
   </div>
 
   <div class="page-container">
-    <StudentFormModal
-      :show="showEditModal"
-      :student-data="selectedStudent"
-      :promotions="promotions"
-      :groups="groups"
-      :is-edit="true"
-      @close="showEditModal = false"
-      @save="handleUpdate"
-    />
+    <StudentFormModal :show="showEditModal" :student-data="selectedStudent" :promotions="promotions" :groups="groups"
+      :is-edit="true" @close="showEditModal = false" @save="handleUpdate" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import api from '@/services/api'
+
 import type { Student, Promotion, Group, StudentUpdatePayload } from '@/types'
+
 import AppLoading from '@/components/common/AppLoading.vue';
 import AppEmptyState from '@/components/common/AppEmptyState.vue';
-import { Pencil, Trash2 } from 'lucide-vue-next';
-import { useUiStore } from '@/stores/ui';
 import StudentFormModal from '@/components/students/StudentFormModal.vue';
+
+import { Pencil, Trash2 } from 'lucide-vue-next';
+
+import { useUiStore } from '@/stores/ui';
 
 const ui = useUiStore();
 
@@ -143,7 +143,7 @@ const openEditModal = (student: Student) => {
 const handleUpdate = async (payload: StudentUpdatePayload) => {
   try {
     await api.updateStudent(payload.id, payload);
-    
+
     ui.notify("Profil mis à jour avec succès !", "success");
     showEditModal.value = false;
     await loadData();

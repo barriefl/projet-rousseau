@@ -14,13 +14,9 @@
 
     <AppLoading v-if="isLoading" message="Chargement des catégories et des règles..." />
 
-    <div v-else-if="categories.length === 0" class="empty-state">
-      <div class="empty-content">
-        <span class="empty-icon">📁</span>
-        <p>Aucune catégorie n'a été trouvée dans la base de données.</p>
-        <button class="btn btn-outline" @click="loadData">🔄 Réessayer</button>
-      </div>
-    </div>
+    <AppEmptyState v-else-if="categories.length === 0" title="Aucune catégorie"
+      message="Impossible de charger les catégories de règles." :showRetry="true" :loading="isLoading"
+      @retry="loadData" />
 
     <div v-else class="workspace-layout">
       <div class="categories-grid">
@@ -103,11 +99,16 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import api from '@/services/api';
+
 import type { Category, Rule } from '@/types';
 import { MistakeType } from '@/types/generated_enums'
+
 import AppLoading from '@/components/common/AppLoading.vue';
-import api from '@/services/api';
+import AppEmptyState from '@/components/common/AppEmptyState.vue';
+
 import { RefreshCw, Loader2, Pencil } from 'lucide-vue-next';
+
 import { useUiStore } from '@/stores/ui';
 
 const ui = useUiStore();

@@ -70,8 +70,8 @@
                 <span v-else class="text-muted">-</span>
               </td>
             </tr>
-            <tr v-if="filteredStudents.length === 0">
-              <td colspan="5" class="empty-state">
+            <tr>
+              <td colspan="5" v-if="filteredStudents.length === 0">
                 <AppEmptyState title="Aucun étudiant" message="Essayez de modifier vos filtres de recherche." />
               </td>
             </tr>
@@ -86,7 +86,9 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
+
 import type { StudentProgression } from '@/types';
+
 import AppLoading from '@/components/common/AppLoading.vue';
 import AppEmptyState from '@/components/common/AppEmptyState.vue';
 
@@ -264,11 +266,5 @@ const avgProgress = computed(() => {
 
 .bg-neutral {
   background-color: var(--neutral);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 30px !important;
-  color: #7f8c8d;
 }
 </style>

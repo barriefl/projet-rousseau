@@ -6,7 +6,11 @@
 
     <AppLoading v-if="isLoading" message="Chargement des graphiques..." />
 
-    <div v-else-if="stats">
+    <AppEmptyState v-else-if="!stats" title="Aucune donnée statistique"
+      message="Impossible de charger les données de l'étude." :showRetry="true" :loading="isLoading"
+      @retry="fetchStudy" />
+
+    <div v-else>
 
       <h2 class="section-title">Hypothèse 1 : Dictées (Var. Principale) vs Outils (Var. Secondaire)</h2>
       <div class="grid-2">
@@ -93,10 +97,14 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, reactive } from 'vue';
 import api from '@/services/api';
+
 import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js';
 import type { ChartData, ChartOptions, ChartDataset, TooltipItem } from 'chart.js';
 import { Bar } from 'vue-chartjs';
+
 import AppLoading from '@/components/common/AppLoading.vue';
+import AppEmptyState from '@/components/common/AppEmptyState.vue';
+
 import type { CustomDataset, CustomBarElement, RousseauStats } from '@/types';
 
 const variableThicknessPlugin = {
@@ -137,7 +145,8 @@ const selectedH4 = reactive<Record<string, string>>({});
 const h4SortBy = ref<'Initial' | 'Progress' | 'Effectif'>('Effectif');
 const useThicknessScaling = ref(true);
 
-onMounted(async () => {
+const fetchStudy = async () => {
+  isLoading.value = true;
   try {
     const res = await api.getRousseauStats();
     const fetchedData = res as RousseauStats;
@@ -156,7 +165,11 @@ onMounted(async () => {
   } finally {
     isLoading.value = false;
   }
-});
+};
+
+onMounted(() => {
+  fetchStudy();
+})
 
 // --- LOGIQUE H1. ---
 const h1DictationChartData = computed<ChartData<'bar'>>(() => {
