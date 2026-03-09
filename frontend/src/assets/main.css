@@ -140,6 +140,13 @@ body {
 /* ==========================================================================
      GRILLES & CARTES
      ========================================================================== */
+.grid-1 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 25px;
+  margin-bottom: 30px;
+}
+
 .grid-2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));

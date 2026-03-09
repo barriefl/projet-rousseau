@@ -283,9 +283,10 @@ export interface H2Equivalence {
   effectif: number[]
 }
 
-export interface TeacherStat {
-  score: number
-  effectif: number
+export interface H2BoxplotData {
+  initial: number[]
+  final: number[]
+  delta: number[]
 }
 
 export interface H4DataPoint {
@@ -294,9 +295,15 @@ export interface H4DataPoint {
   Effectif: number
 }
 
+export interface TeacherStat {
+  score: number
+  effectif: number
+}
+
 export interface RousseauStats {
   h1_summary: H1Summary
   h2_equivalence: H2Equivalence
+  h2_boxplots: Record<string, H2BoxplotData>
   h3_teacher: Record<string, TeacherStat>
   h4_sociocultural: Record<string, Record<string, Record<string, H4DataPoint>>>
 }

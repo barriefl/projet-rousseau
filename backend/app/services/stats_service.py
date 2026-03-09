@@ -116,7 +116,7 @@ class StatsService:
             h1_final["tools_initial"].append(safe_avg(vd2_i))
             h1_final["tools_final"].append(safe_avg(vd2_f))
 
-            # H2 : Progression stricte
+            # H2
             g2_s = [
                 final_scores[s.id] for s in p_st if s.group and s.group.name == "G2"
             ]
@@ -138,6 +138,18 @@ class StatsService:
             h2_final["g2_progress"].append(safe_avg(g2_p))
             h2_final["g5_final"].append(safe_avg(g5_s))
             h2_final["g5_progress"].append(safe_avg(g5_p))
+
+        all_groups = sorted(list(set(s.group.name for s in students if s.group)))
+        h2_boxplots = {}
+
+        for g_name in all_groups:
+            g_st = [s for s in students if s.group and s.group.name == g_name]
+            
+            h2_boxplots[g_name] = {
+                "initial": [initial_scores[s.id] for s in g_st if s.id in initial_scores],
+                "final": [final_scores[s.id] for s in g_st if s.id in final_scores],
+                "delta": [progressions[s.id] for s in g_st if s.id in progressions]
+            }
 
         # H3
         total_g4 = len([s for s in students if s.group and s.group.name == "G4"])
@@ -246,6 +258,7 @@ class StatsService:
         return {
             "h1_summary": h1_final,
             "h2_equivalence": h2_final,
+            "h2_boxplots": h2_boxplots,
             "h3_teacher": {
                 "Accompagnement Humain (G4)": {
                     "score": safe_avg(f_g4),

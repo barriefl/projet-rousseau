@@ -33,6 +33,15 @@
 
       <h2 class="section-title">Hypothèse 2 : Équivalence Projet Voltaire vs Ecri+ (G2 vs G5)</h2>
       <div class="grid-1">
+
+        <div class="card chart-container">
+          <h3>Distribution des scores (tous les groupes)</h3>
+          <p class="chart-desc">Médiane, quartiles et valeurs extrêmes</p>
+          <div class="chart-wrapper">
+            <Chart type="boxplot" :data="h2BoxplotChartData" :options="boxplotOptions" />
+          </div>
+        </div>
+
         <div class="card chart-container">
           <h3>Comparaison Globale</h3>
           <p class="chart-desc">Score Final (Barres pleines) et Progrès (Barres claires) en %</p>
@@ -100,7 +109,8 @@ import api from '@/services/api';
 
 import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js';
 import type { ChartData, ChartOptions, ChartDataset, TooltipItem } from 'chart.js';
-import { Bar } from 'vue-chartjs';
+import { Bar, Chart } from 'vue-chartjs';
+import { BoxPlotController, BoxAndWiskers } from '@sgratzl/chartjs-chart-boxplot';
 
 import AppLoading from '@/components/common/AppLoading.vue';
 import AppEmptyState from '@/components/common/AppEmptyState.vue';
@@ -135,7 +145,7 @@ const variableThicknessPlugin = {
   }
 };
 
-ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, variableThicknessPlugin);
+ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, BoxPlotController, BoxAndWiskers, variableThicknessPlugin);
 
 // --- ÉTATS. ---
 const isLoading = ref(true);
@@ -241,6 +251,60 @@ const h2ChartData = computed<ChartData<'bar'>>(() => {
 });
 
 const barOptions = computed(() => getOptionsWithEffectif('Précision / Score (%)', 'h2_equivalence'));
+
+const h2BoxplotChartData = computed<ChartData<'boxplot'>>(() => {
+  const boxData = stats.value?.h2_boxplots;
+  if (!boxData) return { labels: [], datasets: [] };
+
+  const entries = Object.entries(boxData).sort((a, b) => a[0].localeCompare(b[0]));
+
+  const groups = entries.map(e => e[0]);
+
+  return {
+    labels: groups,
+    datasets: [
+      {
+        label: 'Score Initial',
+        backgroundColor: 'rgba(231, 76, 60, 0.5)',
+        borderColor: '#c0392b',
+        borderWidth: 1,
+        outlierBackgroundColor: '#c0392b',
+        data: entries.map(e => e[1].initial)
+      },
+      {
+        label: 'Score Final',
+        backgroundColor: 'rgba(52, 152, 219, 0.5)',
+        borderColor: '#2980b9',
+        borderWidth: 1,
+        outlierBackgroundColor: '#2980b9',
+        data: entries.map(e => e[1].final)
+      },
+      {
+        label: 'Progression (Delta)',
+        backgroundColor: 'rgba(46, 204, 113, 0.5)',
+        borderColor: '#27ae60',
+        borderWidth: 1,
+        outlierBackgroundColor: '#27ae60',
+        data: entries.map(e => e[1].delta)
+      }
+    ]
+  };
+});
+
+const boxplotOptions = computed<ChartOptions<'boxplot'>>(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { position: 'bottom' },
+    tooltip: {
+    }
+  },
+  scales: {
+    y: {
+      title: { display: true, text: 'Précision (%) / Delta' }
+    }
+  }
+}));
 
 // --- LOGIQUE H3. ---
 const h3Data = computed<ChartData<'bar'>>(() => {

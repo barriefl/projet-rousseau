@@ -17,6 +17,7 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@sgratzl/chartjs-chart-boxplot": "^4.4.5",
     "axios": "^1.13.5",
     "chart.js": "^4.5.1",
     "lucide-vue-next": "^0.576.0",
