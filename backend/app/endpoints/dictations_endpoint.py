@@ -8,7 +8,7 @@ from app.models import Dictation
 from app.schemas.dictation_schema import DictationCreate, DictationResponse
 from app.services.correction_service import CorrectionService
 
-router = APIRouter()
+router = APIRouter(prefix="/dictations", tags=["Dictations"])
 
 
 @router.post("/", response_model=DictationResponse, status_code=status.HTTP_201_CREATED)

@@ -74,29 +74,19 @@ app.include_router(
     prefix="/api",
     dependencies=[Depends(verify_token)],
 )
-
 app.include_router(
-    stats_endpoint.router,
-    prefix="/api/stats",
-    tags=["Stats"],
-    dependencies=[Depends(verify_token)],
-)
-app.include_router(
-    submissions_endpoint.router,
-    prefix="/api/submissions",
-    tags=["Submissions"],
+    dictations_endpoint.router,
+    prefix="/api",
     dependencies=[Depends(verify_token)],
 )
 app.include_router(
     students_endpoint.router,
-    prefix="/api/students",
-    tags=["Students"],
+    prefix="/api",
     dependencies=[Depends(verify_token)],
 )
 app.include_router(
-    dictations_endpoint.router,
-    prefix="/api/dictations",
-    tags=["Dictations"],
+    submissions_endpoint.router,
+    prefix="/api",
     dependencies=[Depends(verify_token)],
 )
 app.include_router(
@@ -104,7 +94,11 @@ app.include_router(
 )
 app.include_router(
     rules_endpoint.router,
-    prefix="/api/rules",
-    tags=["Rules"],
+    prefix="/api",
+    dependencies=[Depends(verify_token)],
+)
+app.include_router(
+    stats_endpoint.router,
+    prefix="/api",
     dependencies=[Depends(verify_token)],
 )

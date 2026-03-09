@@ -5,7 +5,7 @@ from app.database import get_session
 from app.schemas.stats_schema import EmileStatsResponse, RousseauStatsResponse
 from app.services.stats_service import StatsService
 
-router = APIRouter()
+router = APIRouter(prefix="/stats", tags=["Stats"])
 
 
 def get_stats_service(db: Session = Depends(get_session)) -> StatsService:

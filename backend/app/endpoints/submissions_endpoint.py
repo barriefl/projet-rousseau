@@ -9,7 +9,7 @@ from app.models import Dictation, Mistake, Student, Submission
 from app.schemas.submission_schema import SubmissionCreate, SubmissionResponse
 from app.services.correction_service import CorrectionService
 
-router = APIRouter()
+router = APIRouter(prefix="/submissions", tags=["Submissions"])
 
 
 @router.post(

@@ -15,7 +15,7 @@ from app.schemas.student_schema import (
 )
 from app.utils.crypto import decrypt_text, encrypt_text
 
-router = APIRouter()
+router = APIRouter(prefix="/students", tags=["Students"])
 
 
 def _get_val(field):

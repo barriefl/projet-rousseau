@@ -7,7 +7,7 @@ from app.database import get_session
 from app.models import Category, Rule
 from app.schemas.rule_schema import RuleCreate, RuleResponse, RuleUpdate
 
-router = APIRouter()
+router = APIRouter(prefix="/rules", tags=["Rules"])
 
 
 @router.get("/", response_model=List[RuleResponse])
