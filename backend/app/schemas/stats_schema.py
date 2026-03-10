@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 # Dashboard Étude Rousseau.
@@ -18,8 +18,7 @@ class RousseauStatsResponse(BaseModel):
     h4_sociocultural: Dict[str, Any]
     regression_model: Dict[str, Any]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Dashboard É.M.I.L.E.

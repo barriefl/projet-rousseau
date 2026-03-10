@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class GroupBase(BaseModel):
@@ -20,5 +20,4 @@ class GroupUpdate(BaseModel):
 class GroupResponse(GroupBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
