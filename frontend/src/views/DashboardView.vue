@@ -40,6 +40,29 @@
           <div class="chart-wrapper">
             <Chart type="boxplot" :data="h2BoxplotChartData" :options="boxplotOptions" />
           </div>
+
+          <div v-if="stats.h2_stats_test?.anova" class="statistical-verdict">
+            <h4 style="margin-bottom: 10px; font-size: 0.95rem;">Verdict Statistique (Progression) :</h4>
+
+            <div v-if="!stats.h2_stats_test.anova.is_significant" class="verdict-box neutral">
+              <strong>Aucune différence significative.</strong><br>
+              <span class="small-text">L'ANOVA (p = {{ stats.h2_stats_test.anova.p_value }}) montre que les variations
+                de progression entre les groupes sont probablement dues au hasard.</span>
+            </div>
+
+            <div v-else class="verdict-box significant">
+              <strong>Différence significative détectée !</strong><br>
+              <span class="small-text">L'ANOVA (p = {{ stats.h2_stats_test.anova.p_value }}) confirme que les méthodes
+                ont un impact différent.</span>
+
+              <ul class="tukey-list" v-if="stats.h2_stats_test.tukey.length > 0">
+                <li v-for="res in stats.h2_stats_test.tukey" :key="res.group1 + res.group2">
+                  {{ res.conclusion }} <span class="p-val">(p = {{ res.p_value }})</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
         </div>
 
         <div class="card chart-container">
@@ -441,6 +464,49 @@ const horizontalOptions: ChartOptions<'bar'> = {
   font-size: 0.9rem;
   color: #95a5a6;
   margin-bottom: 10px;
+}
+
+/* ==========================================================================
+     STYLE H2.
+     ========================================================================== */
+.statistical-verdict {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px dashed #ccc;
+}
+
+.verdict-box {
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.verdict-box.neutral {
+  background-color: #f8f9fa;
+  border-left: 4px solid #95a5a6;
+  color: #2c3e50;
+}
+
+.verdict-box.significant {
+  background-color: #f0f8ff;
+  border-left: 4px solid #3498db;
+  color: #2c3e50;
+}
+
+.small-text {
+  font-size: 0.8rem;
+  color: #7f8c8d;
+}
+
+.tukey-list {
+  margin-top: 10px;
+  padding-left: 20px;
+  font-size: 0.85rem;
+}
+
+.tukey-list .p-val {
+  color: #e74c3c;
+  font-family: monospace;
 }
 
 /* ==========================================================================

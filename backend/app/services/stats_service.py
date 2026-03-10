@@ -1,3 +1,4 @@
+from scipy import stats
 from sqlmodel import Session, select
 
 from app.models import AssessmentResult, AssessmentType, Dictation, Student, Submission
@@ -144,12 +145,60 @@ class StatsService:
 
         for g_name in all_groups:
             g_st = [s for s in students if s.group and s.group.name == g_name]
-            
+
             h2_boxplots[g_name] = {
-                "initial": [initial_scores[s.id] for s in g_st if s.id in initial_scores],
+                "initial": [
+                    initial_scores[s.id] for s in g_st if s.id in initial_scores
+                ],
                 "final": [final_scores[s.id] for s in g_st if s.id in final_scores],
-                "delta": [progressions[s.id] for s in g_st if s.id in progressions]
+                "delta": [progressions[s.id] for s in g_st if s.id in progressions],
             }
+
+        group_names = []
+        delta_arrays = []
+
+        for g_name, data in h2_boxplots.items():
+            deltas = data["delta"]
+
+            if len(deltas) >= 2:
+                group_names.append(g_name)
+                delta_arrays.append(deltas)
+
+        anova_result = None
+        tukey_results = []
+
+        if len(delta_arrays) >= 2:
+            f_stat, p_value = stats.f_oneway(*delta_arrays)
+            is_significant = bool(p_value < 0.05)
+
+            anova_result = {
+                "f_stat": round(f_stat, 3),
+                "p_value": round(p_value, 4),
+                "is_significant": is_significant
+            }
+
+            if is_significant:
+                tukey = stats.tukey_hsd(*delta_arrays)
+                for i in range(len(group_names)):
+                    for j in range(i + 1, len(group_names)):
+                        p_adj = tukey.pvalue[i, j]
+                        if p_adj < 0.05:
+                            mean_i = sum(delta_arrays[i]) / len(delta_arrays[i])
+                            mean_j = sum(delta_arrays[j]) / len(delta_arrays[j])
+                            
+                            better, worse = (group_names[i], group_names[j]) if mean_i > mean_j else (group_names[j], group_names[i])
+                            
+                            tukey_results.append({
+                                "group1": group_names[i],
+                                "group2": group_names[j],
+                                "p_value": round(p_adj, 4),
+                                "conclusion": f"Le groupe {better} a une progression significativement supérieure au groupe {worse}."
+                            })
+
+        h2_stats_test = {
+            "anova": anova_result,
+            "tukey": tukey_results
+        }
 
         # H3
         total_g4 = len([s for s in students if s.group and s.group.name == "G4"])
@@ -259,6 +308,7 @@ class StatsService:
             "h1_summary": h1_final,
             "h2_equivalence": h2_final,
             "h2_boxplots": h2_boxplots,
+            "h2_stats_test": h2_stats_test,
             "h3_teacher": {
                 "Accompagnement Humain (G4)": {
                     "score": safe_avg(f_g4),

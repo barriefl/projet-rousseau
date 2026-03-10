@@ -9,3 +9,4 @@ tqdm>=4.66.0
 cryptography
 python-multipart
 PyJWT==2.8.0
+scipy

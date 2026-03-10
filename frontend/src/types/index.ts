@@ -2,8 +2,8 @@ import type { AssessmentType, MistakeType, Platform } from './generated_enums'
 
 // --- TYPE POUR AUTH. ---
 export interface AuthResponse {
-  access_token: string;
-  token_type: string;
+  access_token: string
+  token_type: string
 }
 
 // --- TYPES POUR PROMOTIONS. ---
@@ -289,6 +289,24 @@ export interface H2BoxplotData {
   delta: number[]
 }
 
+export interface AnovaResult {
+  f_stat: number
+  p_value: number
+  is_significant: boolean
+}
+
+export interface TukeyResult {
+  group1: string
+  group2: string
+  p_value: number
+  conclusion: string
+}
+
+export interface H2StatsTest {
+  anova: AnovaResult | null
+  tukey: TukeyResult[]
+}
+
 export interface H4DataPoint {
   Initial: number
   Progress: number
@@ -304,6 +322,7 @@ export interface RousseauStats {
   h1_summary: H1Summary
   h2_equivalence: H2Equivalence
   h2_boxplots: Record<string, H2BoxplotData>
+  h2_stats_test: H2StatsTest
   h3_teacher: Record<string, TeacherStat>
   h4_sociocultural: Record<string, Record<string, Record<string, H4DataPoint>>>
 }
