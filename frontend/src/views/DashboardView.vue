@@ -204,13 +204,29 @@ const useThicknessScaling = ref(true);
 const fetchStudy = async () => {
   isLoading.value = true;
   try {
-    const res = await api.getRousseauStats();
-    const fetchedData = res as RousseauStats;
-    stats.value = fetchedData;
+    const cachedData = sessionStorage.getItem('rousseau_stats_cache');
+    const cacheTimestamp = sessionStorage.getItem('rousseau_stats_time');
 
-    if (fetchedData.h4_sociocultural) {
-      Object.keys(fetchedData.h4_sociocultural).forEach(f => {
-        const categories = fetchedData.h4_sociocultural[f];
+    const CACHE_DURATION = 30 * 60 * 1000;
+    const now = Date.now();
+
+    if (cachedData && cacheTimestamp && (now - parseInt(cacheTimestamp) < CACHE_DURATION)) {
+      console.log("Données chargées depuis le cache local.");
+      stats.value = JSON.parse(cachedData);
+    } else {
+      console.log("Calculs en cours sur le serveur (Appel API)...");
+      const res = await api.getRousseauStats();
+      stats.value = res as RousseauStats;
+
+      sessionStorage.setItem('rousseau_stats_cache', JSON.stringify(res));
+      sessionStorage.setItem('rousseau_stats_time', now.toString());
+    }
+
+    const h4Data = stats.value?.h4_sociocultural;
+
+    if (h4Data) {
+      Object.keys(h4Data).forEach(f => {
+        const categories = h4Data[f];
         if (categories) {
           selectedH4[f] = Object.keys(categories)[0] ?? "";
         }
@@ -499,7 +515,7 @@ const regressionOptions: ChartOptions<'bar'> = {
       callbacks: {
         label: (context) => {
           const val = context.raw as number;
-          return val > 0 ? `+${val} pts de progression` : `${val} pts de progression`;
+          return val > 0 ? `+${val} % de progression` : `${val} % de progression`;
         }
       }
     }
