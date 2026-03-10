@@ -122,6 +122,29 @@
         </div>
       </div>
 
+      <div class="h4-section-header" style="margin-top: 60px; border-top: 2px solid #eee; padding-top: 30px;">
+        <h2 class="section-title">Bilan Global : Modèle Prédictif (Régression Multiple)</h2>
+        <p style="color: #7f8c8d; font-size: 0.95rem; margin-bottom: 20px;">
+          Ce modèle isole l'impact de chaque variable en neutralisant toutes les autres.
+          Il permet de comprendre quels facteurs tirent réellement la progression vers le haut ou vers le bas.
+        </p>
+      </div>
+
+      <div class="grid-1" v-if="stats.regression_model && stats.regression_model.coefficients.length > 0">
+        <div class="card chart-container">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <h3>Importance des variables</h3>
+            <span
+              style="background: #f0f8ff; padding: 5px 10px; border-radius: 4px; font-weight: bold; color: #2980b9; font-size: 0.9rem;">
+              Score de fiabilité ($R^2$) : {{ (stats.regression_model.r2 * 100).toFixed(1) }} %
+            </span>
+          </div>
+          <p class="chart-desc">Variables ayant le plus fort impact (positif en vert, négatif en rouge)</p>
+          <div class="chart-wrapper" style="height: 500px;">
+            <Bar :data="regressionChartData" :options="regressionOptions" />
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -439,6 +462,51 @@ const horizontalOptions: ChartOptions<'bar'> = {
       grid: { display: false },
       ticks: { font: { size: 11 }, autoSkip: false }
     }
+  }
+};
+
+// --- LOGIQUE RÉGRESSION MULTIPLE. ---
+const regressionChartData = computed<ChartData<'bar'>>(() => {
+  const reg = stats.value?.regression_model;
+  if (!reg || !reg.coefficients) return { labels: [], datasets: [] };
+
+  const labels = reg.coefficients.map(c => c.feature);
+  const data = reg.coefficients.map(c => c.weight);
+
+  const backgroundColors = data.map(val => val > 0 ? 'rgba(46, 204, 113, 0.7)' : 'rgba(231, 76, 60, 0.7)');
+  const borderColors = data.map(val => val > 0 ? '#27ae60' : '#c0392b');
+
+  return {
+    labels,
+    datasets: [{
+      label: 'Impact sur la progression (Points %)',
+      data,
+      backgroundColor: backgroundColors,
+      borderColor: borderColors,
+      borderWidth: 1,
+      borderRadius: 4
+    }]
+  };
+});
+
+const regressionOptions: ChartOptions<'bar'> = {
+  indexAxis: 'y' as const,
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: (context) => {
+          const val = context.raw as number;
+          return val > 0 ? `+${val} pts de progression` : `${val} pts de progression`;
+        }
+      }
+    }
+  },
+  scales: {
+    x: { title: { display: true, text: 'Poids (Impact en %)' } },
+    y: { ticks: { autoSkip: false, font: { size: 11 } } }
   }
 };
 </script>

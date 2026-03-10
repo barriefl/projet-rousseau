@@ -318,6 +318,16 @@ export interface TeacherStat {
   effectif: number
 }
 
+export interface RegressionFeature {
+  feature: string
+  weight: number
+}
+
+export interface RegressionModel {
+  r2: number
+  coefficients: RegressionFeature[]
+}
+
 export interface RousseauStats {
   h1_summary: H1Summary
   h2_equivalence: H2Equivalence
@@ -325,6 +335,7 @@ export interface RousseauStats {
   h2_stats_test: H2StatsTest
   h3_teacher: Record<string, TeacherStat>
   h4_sociocultural: Record<string, Record<string, Record<string, H4DataPoint>>>
+  regression_model: RegressionModel
 }
 
 export interface CustomDataset {

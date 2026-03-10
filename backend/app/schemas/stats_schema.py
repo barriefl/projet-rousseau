@@ -8,6 +8,7 @@ class TeacherStat(BaseModel):
     score: float
     effectif: int
 
+
 class RousseauStatsResponse(BaseModel):
     h1_summary: Dict[str, Any]
     h2_equivalence: Dict[str, Any]
@@ -15,6 +16,7 @@ class RousseauStatsResponse(BaseModel):
     h2_stats_test: Dict[str, Any]
     h3_teacher: Dict[str, TeacherStat]
     h4_sociocultural: Dict[str, Any]
+    regression_model: Dict[str, Any]
 
     class Config:
         from_attributes = True

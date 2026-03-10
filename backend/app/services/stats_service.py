@@ -1,4 +1,6 @@
+import pandas as pd
 from scipy import stats
+from sklearn.linear_model import LinearRegression
 from sqlmodel import Session, select
 
 from app.models import AssessmentResult, AssessmentType, Dictation, Student, Submission
@@ -174,7 +176,7 @@ class StatsService:
             anova_result = {
                 "f_stat": round(f_stat, 3),
                 "p_value": round(p_value, 4),
-                "is_significant": is_significant
+                "is_significant": is_significant,
             }
 
             if is_significant:
@@ -185,20 +187,23 @@ class StatsService:
                         if p_adj < 0.05:
                             mean_i = sum(delta_arrays[i]) / len(delta_arrays[i])
                             mean_j = sum(delta_arrays[j]) / len(delta_arrays[j])
-                            
-                            better, worse = (group_names[i], group_names[j]) if mean_i > mean_j else (group_names[j], group_names[i])
-                            
-                            tukey_results.append({
-                                "group1": group_names[i],
-                                "group2": group_names[j],
-                                "p_value": round(p_adj, 4),
-                                "conclusion": f"Le groupe {better} a une progression significativement supérieure au groupe {worse}."
-                            })
 
-        h2_stats_test = {
-            "anova": anova_result,
-            "tukey": tukey_results
-        }
+                            better, worse = (
+                                (group_names[i], group_names[j])
+                                if mean_i > mean_j
+                                else (group_names[j], group_names[i])
+                            )
+
+                            tukey_results.append(
+                                {
+                                    "group1": group_names[i],
+                                    "group2": group_names[j],
+                                    "p_value": round(p_adj, 4),
+                                    "conclusion": f"Le groupe {better} a une progression significativement supérieure au groupe {worse}.",
+                                }
+                            )
+
+        h2_stats_test = {"anova": anova_result, "tukey": tukey_results}
 
         # H3
         total_g4 = len([s for s in students if s.group and s.group.name == "G4"])
@@ -304,6 +309,54 @@ class StatsService:
                     for label, v in items
                 }
 
+        # Régression Multiple.
+        regression_results = {"r2": 0, "coefficients": []}
+
+        reg_data = []
+        for s in students:
+            if s.id in progressions and s.id in initial_scores:
+                reg_data.append(
+                    {
+                        "Progression": progressions[s.id],
+                        "Score Initial": initial_scores[s.id],
+                        "Groupe": s.group.name if s.group else "Aucun",
+                        "CSP": str(get_val(s.parent_1_csp))
+                        if s.parent_1_csp
+                        else "Inconnu",
+                        "Diplôme": str(get_val(s.parent_1_degree))
+                        if s.parent_1_degree
+                        else "Inconnu",
+                        "Niveau Lecture": f"Niveau {s.appetence_level}"
+                        if s.appetence_level
+                        else "Inconnu",
+                        "Niveau Déclaré": f"Niveau {s.declared_level}"
+                        if s.declared_level
+                        else "Inconnu",
+                    }
+                )
+
+        if len(reg_data) > 10:
+            df = pd.DataFrame(reg_data)
+
+            y = df["Progression"]
+            X_raw = df.drop(columns=["Progression"])
+
+            X = pd.get_dummies(X_raw, drop_first=False)
+
+            model = LinearRegression()
+            model.fit(X, y)
+
+            r2 = round(model.score(X, y), 3)
+
+            coefs = []
+            for col, coef in zip(X.columns, model.coef_):
+                if abs(coef) > 0.1:
+                    coefs.append({"feature": col, "weight": round(coef, 2)})
+
+            coefs = sorted(coefs, key=lambda x: x["weight"], reverse=True)
+
+            regression_results = {"r2": r2, "coefficients": coefs}
+
         return {
             "h1_summary": h1_final,
             "h2_equivalence": h2_final,
@@ -320,6 +373,7 @@ class StatsService:
                 },
             },
             "h4_sociocultural": h4_final,
+            "regression_model": regression_results,
         }
 
     def get_emile_dashboard_stats(self) -> dict:
