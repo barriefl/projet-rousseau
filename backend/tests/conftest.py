@@ -15,16 +15,27 @@ engine = create_engine(
 )
 
 
+@pytest.fixture(name="engine", scope="session")
+def engine_fixture():
+    test_db_url = "sqlite:///:memory:"
+    engine = create_engine(test_db_url, connect_args={"check_same_thread": False})
+
+    SQLModel.metadata.create_all(engine)
+
+    yield engine
+
+    engine.dispose()
+
+
 @pytest.fixture(name="session")
 def session_fixture():
-    """
-    Cette fixture crée les tables avant chaque test, fournit la session, puis supprime les tables après le test.
-    """
+    """Donne une session propre pour chaque fonction de test."""
 
     SQLModel.metadata.create_all(engine)
 
     with Session(engine) as session:
         yield session
+        session.rollback()
 
     SQLModel.metadata.drop_all(engine)
 
@@ -63,3 +74,13 @@ def auth_client_fixture(session: Session):
     yield client
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def cleanup_database_connections():
+    """
+    Cette fixture s'exécute automatiquement.
+    À la fin de tous les tests, elle ferme proprement les connexions.
+    """
+    yield
+    engine.dispose()
