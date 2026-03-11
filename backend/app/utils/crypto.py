@@ -8,20 +8,24 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-SECRET_KEY = os.getenv("ENCRYPTION_KEY")
 
-if not SECRET_KEY:
-    raise ValueError(
-        "La variable 'ENCRYPTION_KEY' est introuvable dans le fichier .env ! "
-        "Générez en une avec 'Fernet.generate_key().decode()'."
-    )
+def get_cipher_suite():
+    """Initialise et valide la clé de chiffrement."""
+    key = os.getenv("ENCRYPTION_KEY")
+    if not key:
+        raise ValueError(
+            "La variable 'ENCRYPTION_KEY' est introuvable dans le fichier .env ! "
+            "Générez en une avec 'Fernet.generate_key().decode()'."
+        )
+    try:
+        return Fernet(key.encode("utf-8"))
+    except ValueError:
+        raise ValueError(
+            "La 'ENCRYPTION_KEY' n'est pas une clé Fernet valide (32 octets base64)."
+        )
 
-try:
-    cipher_suite = Fernet(SECRET_KEY.encode("utf-8"))
-except ValueError:
-    raise ValueError(
-        "La 'ENCRYPTION_KEY' n'est pas une clé Fernet valide (elle doit faire 32 octets et être encodée en base 64)."
-    )
+
+cipher_suite = get_cipher_suite()
 
 
 def encrypt_text(text: str) -> str | None:
