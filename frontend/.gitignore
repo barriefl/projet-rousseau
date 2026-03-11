@@ -32,10 +32,6 @@ coverage
 /cypress/videos/
 /cypress/screenshots/
 
-# Pytest
-.coverage
-htmlcov/
-
 # Vitest
 __screenshots__/
 

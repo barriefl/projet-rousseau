@@ -16,6 +16,10 @@ __pycache__/
 *.db
 *.txt
 
+# Pytest
+.coverage
+htmlcov/
+
 # IDE settings.
 .vscode/
 .idea/
