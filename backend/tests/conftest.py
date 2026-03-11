@@ -30,12 +30,12 @@ def engine_fixture():
 @pytest.fixture(name="session")
 def session_fixture():
     """Donne une session propre pour chaque fonction de test."""
-
     SQLModel.metadata.create_all(engine)
 
     with Session(engine) as session:
         yield session
         session.rollback()
+        session.close()
 
     SQLModel.metadata.drop_all(engine)
 
