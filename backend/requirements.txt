@@ -12,5 +12,6 @@ PyJWT==2.8.0
 scipy
 scikit-learn
 pandas
-pytest 
+pytest
+pytest-cov
 httpx

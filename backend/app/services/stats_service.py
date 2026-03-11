@@ -3,7 +3,7 @@ from scipy import stats
 from sklearn.linear_model import LinearRegression
 from sqlmodel import Session, select
 
-from app.models import AssessmentResult, AssessmentType, Dictation, Student, Submission
+from app.models import AssessmentResult, Dictation, Student, Submission
 from app.models.entities import Category
 
 
@@ -22,24 +22,21 @@ class StatsService:
         total_words = len(dictation_text.split()) if dictation_text else 1
 
         def to_precision(malus: float) -> float:
-            if malus is None:
-                return 0.0
             return round(max(0.0, ((total_words - malus) / total_words) * 100), 2)
+        
+        def get_ass_name(enum_obj):
+            return enum_obj.name if hasattr(enum_obj, "name") else str(enum_obj).upper()
 
         initial_scores = {}
         final_scores = {}
 
         for student in students:
             for sub in student.submissions:
-                if (
-                    sub.assessment_type == AssessmentType.INITIAL
-                    and sub.final_score is not None
-                ):
+                ass_name = get_ass_name(sub.assessment_type)
+                
+                if ass_name == "INITIAL" and sub.final_score is not None:
                     initial_scores[student.id] = to_precision(sub.final_score)
-                elif (
-                    sub.assessment_type == AssessmentType.FINAL
-                    and sub.final_score is not None
-                ):
+                elif ass_name == "FINAL" and sub.final_score is not None:
                     final_scores[student.id] = to_precision(sub.final_score)
 
         progressions = {}
@@ -102,14 +99,14 @@ class StatsService:
             vd2_i = [
                 a.score
                 for a in assessments
-                if a.assessment_type == AssessmentType.INITIAL
+                if get_ass_name(a.assessment_type) == "INITIAL"
                 and a.student.promotion
                 and a.student.promotion.name == p_name
             ]
             vd2_f = [
                 a.score
                 for a in assessments
-                if a.assessment_type == AssessmentType.FINAL
+                if get_ass_name(a.assessment_type) == "FINAL"
                 and a.student.promotion
                 and a.student.promotion.name == p_name
             ]
@@ -417,9 +414,6 @@ class StatsService:
         mistakes_stats = {"global": {}, "promotions": {}}
 
         for sub in submissions:
-            if sub.final_score is None:
-                continue
-
             ass_type = (
                 sub.assessment_type.name
                 if hasattr(sub.assessment_type, "name")
@@ -427,9 +421,6 @@ class StatsService:
             )
             score = sub.final_score
             student = sub.student
-
-            if not student:
-                continue
 
             p_name = student.promotion.name if student.promotion else "Sans promo"
             g_code = student.group.name if student.group else "Sans groupe"
