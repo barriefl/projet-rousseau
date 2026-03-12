@@ -28,6 +28,8 @@ jobs:
         env:
           DATABASE_URL: "sqlite:///./test.db"
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
           cd backend
           pytest --cov=app --cov-report=xml
