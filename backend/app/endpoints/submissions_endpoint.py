@@ -1,4 +1,5 @@
 import socket
+import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -72,8 +73,14 @@ def create_submission(
     session.refresh(submission)
 
     return {
-        "message": "Dictée importée et analysée avec succès !",
-        "submission_id": submission.id,
+        "id": submission.id,
+        "created_at": submission.created_at.isoformat(),
+        "student_uuid": student.anonymous_id,
+        "dictation_id": submission.dictation_id,
+        "assessment_type": submission.assessment_type,
+        "content_student": submission.content_student,
+        "final_score": submission.final_score,
+        "scores": submission.scores,
     }
 
 
@@ -184,8 +191,10 @@ def get_all_submissions(
 ):
 
     if student_uuid:
+        uid = uuid.UUID(student_uuid) if isinstance(student_uuid, str) else student_uuid
+
         student = session.exec(
-            select(Student).where(Student.anonymous_id == student_uuid)
+            select(Student).where(Student.anonymous_id == uid)
         ).first()
 
         if not student:
