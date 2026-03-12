@@ -16,12 +16,6 @@ def get_all_rules(session: Session = Depends(get_session)):
     return session.exec(select(Rule)).all()
 
 
-@router.get("/unclassified", response_model=List[RuleResponse])
-def get_unclassified_rules(session: Session = Depends(get_session)):
-    """Récupère uniquement les règles qui n'ont pas encore été assignées à une catégorie."""
-    return session.exec(select(Rule).where(Rule.category_id is None)).all()
-
-
 @router.post("/", response_model=RuleResponse, status_code=status.HTTP_201_CREATED)
 def create_rule(rule_in: RuleCreate, session: Session = Depends(get_session)):
     """Crée manuellement une nouvelle règle."""
