@@ -782,9 +782,9 @@ const anovaInitialOptions: ChartOptions<'bar'> = {
   font-weight: 500;
 }
 
-
-
-
+/* ==========================================================================
+     ANOVA MULTIFACTORIELLE.
+     ========================================================================== */
 
 .grid-2-dynamic {
   display: grid;
@@ -835,7 +835,6 @@ const anovaInitialOptions: ChartOptions<'bar'> = {
   border-radius: 10px;
   font-size: 0.7rem;
   color: transparent;
-  /* Masque le texte, on utilise la largeur pour l'impact */
 }
 
 .is-significant .impact-badge {
