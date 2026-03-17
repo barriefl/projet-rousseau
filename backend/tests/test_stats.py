@@ -72,6 +72,7 @@ def test_get_rousseau_stats_empty_db(auth_client):
             "Orthographe, grammaire, conjugaison": {"Niveau déclaré": {}},
         },
         "regression_model": {"r2": 0, "coefficients": []},
+        "anova_multifactorial": [],
     }
 
     assert data == expected_empty_state

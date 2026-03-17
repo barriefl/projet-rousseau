@@ -122,6 +122,37 @@
         </div>
       </div>
 
+      <h2 class="section-title">Analyse du Niveau Initial (Déterminisme)</h2>
+      <p class="chart-desc" style="margin-bottom: 20px;">
+        Quels facteurs expliquent les disparités de niveau <strong>dès le début</strong> de l'année ?
+        (Analyse de la note initiale en fonction des variables socioculturelles).
+      </p>
+
+      <div class="grid-1" v-if="stats.anova_multifactorial && stats.anova_multifactorial.length > 0">
+        <div class="card chart-container">
+          <div class="grid-2-dynamic">
+            <div class="chart-wrapper" style="height: 350px;">
+              <Bar :data="anovaInitialChartData" :options="anovaInitialOptions" />
+            </div>
+
+            <div class="verdicts-list">
+              <h4 style="font-size: 0.9rem; color: #34495e; margin-bottom: 15px;">Détails des facteurs :</h4>
+              <div v-for="factor in stats.anova_multifactorial" :key="factor.factor" class="factor-row"
+                :class="{ 'is-significant': factor.is_significant }">
+                <div class="factor-info">
+                  <span class="factor-name">{{ factor.factor }}</span>
+                  <span class="factor-p">
+                    p {{ factor.p_value === 0 ? '< 0.0001' : '= ' + factor.p_value }} </span>
+                </div>
+                <div class="impact-badge" :style="{ width: factor.impact_percent + '%' }">
+                  {{ factor.impact_percent }}%
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="h4-section-header" style="margin-top: 60px; border-top: 2px solid #eee; padding-top: 30px;">
         <h2 class="section-title">Bilan Global : Modèle Prédictif (Régression Multiple)</h2>
         <p style="color: #7f8c8d; font-size: 0.95rem; margin-bottom: 20px;">
@@ -525,6 +556,71 @@ const regressionOptions: ChartOptions<'bar'> = {
     y: { ticks: { autoSkip: false, font: { size: 11 } } }
   }
 };
+
+// --- LOGIQUE ANOVA MULTIFACTORIELLE. ---
+interface AnovaChartDataset extends ChartDataset<'bar'> {
+  pValues: number[];
+  significantStatus: boolean[];
+}
+
+const anovaInitialChartData = computed<ChartData<'bar'>>(() => {
+  const anova = stats.value?.anova_multifactorial;
+  if (!anova || anova.length === 0) return { labels: [], datasets: [] };
+
+  const sortedData = [...anova].sort((a, b) => b.impact_percent - a.impact_percent);
+
+  return {
+    labels: sortedData.map(a => a.factor),
+    datasets: [{
+      label: 'Part de la variance expliquée (%)',
+      data: sortedData.map(a => a.impact_percent),
+      backgroundColor: sortedData.map(a =>
+        a.is_significant ? 'rgba(52, 152, 219, 0.7)' : 'rgba(149, 165, 166, 0.4)'
+      ),
+      borderColor: sortedData.map(a =>
+        a.is_significant ? '#2980b9' : '#95a5a6'
+      ),
+      borderWidth: 1,
+      borderRadius: 4,
+
+      pValues: sortedData.map(a => a.p_value),
+      significantStatus: sortedData.map(a => a.is_significant)
+    }]
+  };
+});
+
+const anovaInitialOptions: ChartOptions<'bar'> = {
+  indexAxis: 'y' as const,
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: (context) => `Impact : ${context.raw}% de la note initiale`,
+        afterLabel: (context) => {
+          const dataset = context.dataset as AnovaChartDataset;
+
+          const p = dataset.pValues?.[context.dataIndex];
+          const sig = dataset.significantStatus?.[context.dataIndex];
+
+          if (p === undefined) return '';
+
+          const pDisplay = p === 0 ? '< 0.0001' : p.toString();
+
+          return `Significatif : ${sig ? 'Oui' : 'Non'} (p = ${pDisplay})`;
+        }
+      }
+    }
+  },
+  scales: {
+    x: {
+      beginAtZero: true,
+      max: 100,
+      title: { display: true, text: 'Poids du facteur sur le niveau d\'entrée (%)' }
+    }
+  }
+};
 </script>
 
 <style scoped>
@@ -684,5 +780,71 @@ const regressionOptions: ChartOptions<'bar'> = {
   color: #4a5568;
   cursor: pointer;
   font-weight: 500;
+}
+
+
+
+
+
+.grid-2-dynamic {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 30px;
+}
+
+@media (max-width: 900px) {
+  .grid-2-dynamic {
+    grid-template-columns: 1fr;
+  }
+}
+
+.factor-row {
+  margin-bottom: 12px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #ddd;
+  transition: 0.3s;
+}
+
+.factor-row.is-significant {
+  background: #f0f8ff;
+  border-left-color: #3498db;
+}
+
+.factor-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.factor-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.factor-p {
+  font-size: 0.75rem;
+  color: #95a5a6;
+  font-family: monospace;
+}
+
+.impact-badge {
+  height: 6px;
+  background: #bdc3c7;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  color: transparent;
+  /* Masque le texte, on utilise la largeur pour l'impact */
+}
+
+.is-significant .impact-badge {
+  background: #3498db;
+}
+
+.verdicts-list {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 </style>

@@ -354,6 +354,13 @@ export interface RegressionModel {
   coefficients: RegressionFeature[]
 }
 
+export interface AnovaFactorResult {
+  factor: string
+  p_value: number
+  is_significant: boolean
+  impact_percent: number
+}
+
 export interface RousseauStats {
   h1_summary: H1Summary
   h2_equivalence: H2Equivalence
@@ -362,6 +369,7 @@ export interface RousseauStats {
   h3_teacher: Record<string, TeacherStat>
   h4_sociocultural: Record<string, Record<string, Record<string, H4DataPoint>>>
   regression_model: RegressionModel
+  anova_multifactorial: AnovaFactorResult[]
 }
 
 export interface CustomDataset {

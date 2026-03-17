@@ -1,8 +1,10 @@
 import pandas as pd
+import statsmodels.api as sm
 from scipy import stats
 from sklearn.linear_model import LinearRegression
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
+from statsmodels.formula.api import ols
 
 from app.models import AssessmentResult, Dictation, Student, Submission
 from app.models.entities import Category
@@ -11,6 +13,16 @@ from app.models.entities import Category
 class StatsService:
     def __init__(self, session: Session):
         self.session = session
+
+    def _group_rare_categories(
+        self, df: pd.DataFrame, column: str, threshold: int = 5
+    ) -> pd.Series:
+        """
+        Remplace les catégories qui apparaissent moins de 'threshold' fois par la valeur 'Autres'.
+        """
+        counts = df[column].value_counts()
+        rare_cats = counts[counts < threshold].index
+        return df[column].apply(lambda x: "Autres" if x in rare_cats else x)
 
     def get_rousseau_dashboard_stats(self) -> dict:
         students = self.session.exec(
@@ -311,6 +323,72 @@ class StatsService:
                     for label, v in items
                 }
 
+        # ANOVA Multifactorielle.
+        anova_initial_results = []
+
+        anova_data = []
+        for s in students:
+            if s.id in initial_scores:
+                anova_data.append(
+                    {
+                        "InitialScore": initial_scores[s.id],
+                        "CSP": str(get_val(s.parent_1_csp))
+                        if s.parent_1_csp
+                        else "Inconnu",
+                        "Diplome": str(get_val(s.parent_1_degree))
+                        if s.parent_1_degree
+                        else "Inconnu",
+                        "Appetence": f"Niveau_{s.appetence_level}"
+                        if s.appetence_level
+                        else "Inconnu",
+                        "DeclaredLevel": f"Niveau_{s.declared_level}"
+                        if s.declared_level
+                        else "Inconnu",
+                    }
+                )
+
+        df_anova = pd.DataFrame(anova_data)
+
+        if len(anova_data) > 20:
+            df_anova["CSP_grouped"] = self._group_rare_categories(
+                df_anova, "CSP", threshold=8
+            )
+            df_anova["Diplome_grouped"] = self._group_rare_categories(
+                df_anova, "Diplome", threshold=8
+            )
+
+        formula = "InitialScore ~ C(CSP_grouped) + C(Diplome_grouped) + C(Appetence) + C(DeclaredLevel)"
+
+        try:
+            model_anova = ols(formula, data=df_anova).fit()
+            anova_table = sm.stats.anova_lm(model_anova, typ=2)
+
+            anova_table["eta_sq"] = anova_table["sum_sq"] / sum(anova_table["sum_sq"])
+
+            factors_to_check = [
+                ("C(CSP_grouped)", "CSP"),
+                ("C(Diplome_grouped)", "Diplôme"),
+                ("C(Appetence)", "Appétence Lecture"),
+                ("C(DeclaredLevel)", "Niveau Déclaré"),
+            ]
+
+            for table_key, display_name in factors_to_check:
+                if table_key in anova_table.index:
+                    p_val = anova_table.loc[table_key, "PR(>F)"]
+                    eta_sq = anova_table.loc[table_key, "eta_sq"]
+
+                    anova_initial_results.append(
+                        {
+                            "factor": display_name,
+                            "p_value": round(p_val, 4),
+                            "is_significant": bool(p_val < 0.05),
+                            "impact_percent": round(eta_sq * 100, 1),
+                        }
+                    )
+
+        except Exception as e:
+            print(f"Erreur ANOVA : {e}")
+
         # Régression Multiple.
         regression_results = {"r2": 0, "coefficients": []}
 
@@ -376,6 +454,7 @@ class StatsService:
             },
             "h4_sociocultural": h4_final,
             "regression_model": regression_results,
+            "anova_multifactorial": anova_initial_results,
         }
 
     def get_emile_dashboard_stats(self) -> dict:

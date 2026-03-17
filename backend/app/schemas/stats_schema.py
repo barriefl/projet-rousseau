@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from pydantic import BaseModel, ConfigDict
 
@@ -9,6 +9,13 @@ class TeacherStat(BaseModel):
     effectif: int
 
 
+class AnovaFactorResult(BaseModel):
+    factor: str
+    p_value: float
+    is_significant: bool
+    impact_percent: float
+
+
 class RousseauStatsResponse(BaseModel):
     h1_summary: Dict[str, Any]
     h2_equivalence: Dict[str, Any]
@@ -17,6 +24,7 @@ class RousseauStatsResponse(BaseModel):
     h3_teacher: Dict[str, TeacherStat]
     h4_sociocultural: Dict[str, Any]
     regression_model: Dict[str, Any]
+    anova_multifactorial: List[AnovaFactorResult]
 
     model_config = ConfigDict(from_attributes=True)
 
