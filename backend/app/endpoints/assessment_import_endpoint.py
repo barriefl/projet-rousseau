@@ -8,7 +8,6 @@ from app.schemas.assessment_schema import (
     AssessmentExecuteRequest,
     AssessmentPreviewResponse,
     AssessmentType,
-    Platform,
 )
 from app.services.assessment_import_service import AssessmentImportService
 
@@ -20,7 +19,7 @@ router = APIRouter(prefix="/import/assessments", tags=["Importation Evaluations"
 )
 async def preview_assessment_import(
     promotion_id: int = Form(...),
-    platform: Platform = Form(...),
+    tool_id: int = Form(...),
     assessment_type: AssessmentType = Form(...),
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
@@ -35,7 +34,7 @@ async def preview_assessment_import(
         file_content = await file.read()
         service = AssessmentImportService(session)
         return service.analyze_file(
-            promotion_id, platform, assessment_type, file_content
+            promotion_id, tool_id, assessment_type, file_content
         )
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

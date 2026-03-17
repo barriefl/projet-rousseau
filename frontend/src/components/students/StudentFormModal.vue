@@ -48,6 +48,15 @@
                                     <option v-for="grp in groups" :key="grp.id" :value="grp.id">{{ grp.name }}</option>
                                 </select>
                             </div>
+                            <div class="field">
+                                <label>Outil utilisé</label>
+                                <select class="form-control" v-model="form.tool_id">
+                                    <option :value="null">-- Aucun --</option>
+                                    <option v-for="t in tools" :key="t.id" :value="t.id">
+                                        {{ t.full_name }}
+                                    </option>
+                                </select>
+                            </div>
                         </div>
                     </section>
 
@@ -166,13 +175,14 @@ import {
     Library as Users, Fingerprint
 } from 'lucide-vue-next';
 import { CSP, Degree, Library, ReadingSupport } from '@/types/generated_enums';
-import type { Student, Promotion, Group } from '@/types';
+import type { Student, Promotion, Group, Tool } from '@/types';
 
 const props = defineProps<{
     show: boolean;
     studentData: Student | null;
     promotions: Promotion[];
     groups: Group[];
+    tools: Tool[];
     isEdit?: boolean;
     lockPromotionId?: number | null;
 }>();
@@ -208,6 +218,7 @@ const handleSave = () => {
         motive: selectedMotives.value.join(';'),
         promotion_id: form.value.promotion_id || null,
         group_id: form.value.group_id || null,
+        tool_id: form.value.tool_id || null,
         appetence_level: form.value.appetence_level ? String(form.value.appetence_level) : null
     };
     emit('save', payload);

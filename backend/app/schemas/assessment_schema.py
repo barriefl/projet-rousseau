@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from app.models import AssessmentType, Platform
+from app.models import AssessmentType
 
 
 class AssessmentMatchPreview(BaseModel):
@@ -17,7 +17,7 @@ class AssessmentMatchPreview(BaseModel):
 
 
 class AssessmentPreviewResponse(BaseModel):
-    platform: Platform
+    tool_id: int
     assessment_type: AssessmentType
     matched_results: List[AssessmentMatchPreview]
     unmatched_results: List[AssessmentMatchPreview]
@@ -30,6 +30,7 @@ class AssessmentExecuteAction(BaseModel):
 
 
 class AssessmentExecuteRequest(BaseModel):
-    platform: Platform
+    promotion_id: int
+    tool_id: int
     assessment_type: AssessmentType
     results: List[AssessmentExecuteAction]

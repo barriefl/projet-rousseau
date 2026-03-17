@@ -2,7 +2,7 @@
   <div class="import-workspace">
     <div class="page-header">
       <button class="btn btn-outline" style="margin-right: 15px;" @click="$router.push('/')">← Retour</button>
-      <h1 style="display: inline-block;">Importation des Résultats (Voltaire / Ecri+)</h1>
+      <h1 style="display: inline-block;">Importation des Résultats (Outils)</h1>
     </div>
 
     <div class="panel" v-if="!importSuccess">
@@ -20,11 +20,11 @@
         </div>
 
         <div class="form-group">
-          <label>Outil / Plateforme * :</label>
-          <select v-model="selectedPlatform" :disabled="isAnalyzing" class="action-select">
+          <label>Outil * :</label>
+          <select v-model="selectedTool" :disabled="isAnalyzing" class="action-select">
             <option value="" disabled>-- Choisir --</option>
-            <option v-for="type in Object.values(Platforms)" :key="type" :value="type">
-              {{ type }}
+            <option v-for="tool in tools" :key="tool.id" :value="tool.id">
+              {{ tool.full_name }}
             </option>
           </select>
         </div>
@@ -46,7 +46,7 @@
       </div>
 
       <button class="btn btn-primary btn-with-icon" style="margin-top: 20px;"
-        :disabled="!selectedPromotion || !selectedPlatform || !selectedType || !selectedFile || isAnalyzing"
+        :disabled="!selectedPromotion || !selectedTool|| !selectedType || !selectedFile || isAnalyzing"
         @click="analyzeFile">
         <Loader2 v-if="isAnalyzing" :size="18" class="animate-spin" />
         <Search v-else :size="18" />
@@ -150,11 +150,12 @@ import { ref, onMounted, computed } from 'vue';
 import api from '@/services/api';
 import type {
   Promotion,
+  Tool,
   AssessmentPreviewResponse,
   AssessmentMatchPreview,
   AssessmentExecuteRequest
 } from '@/types';
-import { AssessmentType, Platform } from '@/types/generated_enums';
+import { AssessmentType } from '@/types/generated_enums';
 import {
   Loader2,
   Search,
@@ -169,8 +170,10 @@ const ui = useUiStore();
 
 // --- ÉTATS. ---
 const promotions = ref<Promotion[]>([]);
+const tools = ref<Tool[]>([]);
+
 const selectedPromotion = ref<number | ''>('');
-const selectedPlatform = ref<Platform | ''>('');
+const selectedTool = ref<number | ''>('');
 const selectedType = ref<AssessmentType | ''>('');
 const selectedFile = ref<File | null>(null);
 
@@ -181,7 +184,6 @@ const isExecuting = ref<boolean>(false);
 const importSuccess = ref<boolean>(false);
 const importResult = ref({ created: 0, updated: 0 });
 
-const Platforms = Platform;
 const AssessmentTypes = AssessmentType;
 
 // --- COMPUTED. ---
@@ -196,7 +198,12 @@ const fuzzyMatches = computed(() => {
 // --- CHARGEMENT. ---
 onMounted(async () => {
   try {
-    promotions.value = await api.getPromotions();
+    const [promoRes, toolRes] = await Promise.all([
+      api.getPromotions(),
+      api.getTools()
+    ]);
+    promotions.value = promoRes || [];
+    tools.value = toolRes || [];
   } catch (error) {
     console.error("Erreur chargement promotions:", error);
     ui.notify("Erreur lors du chargement des données.", "error");
@@ -212,7 +219,7 @@ const handleFileUpload = (event: Event) => {
 };
 
 const analyzeFile = async () => {
-  if (!selectedPromotion.value || !selectedPlatform.value || !selectedType.value || !selectedFile.value) return;
+  if (!selectedPromotion.value || !selectedTool.value || !selectedType.value || !selectedFile.value) return;
 
   isAnalyzing.value = true;
   previewData.value = null;
@@ -220,7 +227,7 @@ const analyzeFile = async () => {
   try {
     const res = await api.previewAssessmentImport(
       selectedPromotion.value as number,
-      selectedPlatform.value,
+      selectedTool.value as number,
       selectedType.value,
       selectedFile.value
     );
@@ -259,11 +266,12 @@ const analyzeFile = async () => {
 };
 
 const executeImport = async () => {
-  if (!previewData.value || !selectedPlatform.value || !selectedType.value) return;
+  if (!previewData.value || !selectedTool.value || !selectedType.value) return;
   isExecuting.value = true;
 
   const executePayload: AssessmentExecuteRequest = {
-    platform: selectedPlatform.value as Platform,
+    promotion_id: selectedPromotion.value as number,
+    tool_id: selectedTool.value as number,
     assessment_type: selectedType.value as AssessmentType,
     results: []
   };

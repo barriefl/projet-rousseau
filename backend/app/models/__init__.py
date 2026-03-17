@@ -2,6 +2,7 @@ from .entities import (
     AssessmentResult,
     Category,
     Dictation,
+    Tool,
     Group,
     Mistake,
     Promotion,

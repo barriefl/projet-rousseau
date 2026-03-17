@@ -50,7 +50,7 @@
           <tbody>
             <tr v-for="student in filteredStudents" :key="student.id">
               <td><strong>{{ student.last_name }} {{ student.first_name }}</strong></td>
-              <td><span class="badge-group">{{ student.group_name || '-' }}</span></td>
+              <td><span class="badge-group">{{ student.group_display || '-' }}</span></td>
 
               <td>
                 <span v-if="student.score_initial !== null">{{ student.score_initial }} pts</span>

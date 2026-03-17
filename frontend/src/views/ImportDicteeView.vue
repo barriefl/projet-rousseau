@@ -144,15 +144,16 @@
   </div>
 
   <StudentFormModal :show="showCreateModal" :student-data="(newStudentForm as Student)" :promotions="promotions"
-    :groups="groups" :is-edit="false" :lock-promotion-id="selectedPromotion === '' ? null : selectedPromotion"
-    @close="showCreateModal = false" @save="handleCreateStudent" />
+    :groups="groups" :tools="tools" :is-edit="false"
+    :lock-promotion-id="selectedPromotion === '' ? null : selectedPromotion" @close="showCreateModal = false"
+    @save="handleCreateStudent" />
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
-import type { Student, Dictation, Promotion, Group, StudentCreatePayload, StudentWithScores } from '@/types';
+import type { Student, Dictation, Promotion, Group, StudentCreatePayload, StudentWithScores, Tool } from '@/types';
 import { AssessmentType } from '@/types/generated_enums';
 import AppLoading from '@/components/common/AppLoading.vue';
 import {
@@ -198,6 +199,7 @@ const students = ref<StudentWithScores[]>([]);
 const dictations = ref<Dictation[]>([]);
 const promotions = ref<Promotion[]>([]);
 const groups = ref<Group[]>([]);
+const tools = ref<Tool[]>([]);
 
 // Valeurs globales du formulaire.
 const selectedPromotion = ref<number | ''>('');
@@ -224,16 +226,19 @@ const newStudentForm = ref<Partial<Student>>({
 // --- CHARGEMENT. ---
 onMounted(async () => {
   try {
-    const [studentsRes, dictationsRes, promoRes, groupRes] = await Promise.all([
+    const [studentsRes, dictationsRes, promoRes, groupRes, toolsRes] = await Promise.all([
       api.getStudentsWithScores(),
       api.getDictations(),
       api.getPromotions(),
-      api.getGroups()
+      api.getGroups(),
+      api.getTools()
     ]);
+
     students.value = studentsRes;
     dictations.value = dictationsRes;
     promotions.value = promoRes;
     groups.value = groupRes;
+    tools.value = toolsRes;
   } catch (error) {
     console.error("Erreur de chargement :", error);
     ui.notify("Erreur lors du chargement des données.", "error");
@@ -412,7 +417,8 @@ const openCreateStudentForm = (fileItem: ParsedFile) => {
     last_name: parts[0]?.toUpperCase() || '',
     first_name: parts.slice(1).join(' ') || '',
     promotion_id: selectedPromotion.value === '' ? undefined : selectedPromotion.value,
-    group_id: undefined
+    group_id: undefined,
+    tool_id: undefined,
   };
 
   showCreateModal.value = true;

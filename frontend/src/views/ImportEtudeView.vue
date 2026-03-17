@@ -19,6 +19,16 @@
           </select>
         </div>
 
+        <div class="form-group" style="flex: 1;">
+          <label>Outil utilisé :</label>
+          <select v-model="selectedTool" :disabled="isAnalyzing">
+            <option value="" disabled>-- Outil --</option>
+            <option v-for="tool in outils" :key="tool.id" :value="tool.id">
+              {{ tool.full_name }}
+            </option>
+          </select>
+        </div>
+
         <div class="form-group" style="flex: 2;">
           <label>Fichier CSV de l'étude :</label>
           <input type="file" accept=".csv" @change="handleFileUpload" :disabled="isAnalyzing" class="file-input" />
@@ -123,7 +133,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import api from '@/services/api';
-import type { Promotion, StudentMatchPreview, ImportPreviewResponse, ImportExecutePayload } from '@/types';
+import type { Promotion, StudentMatchPreview, ImportPreviewResponse, ImportExecutePayload, Tool } from '@/types';
 import {
   Search,
   Loader2,
@@ -138,7 +148,10 @@ const ui = useUiStore();
 
 // --- ÉTATS. ---
 const promotions = ref<Promotion[]>([]);
+const outils = ref<Tool[]>([]);
+
 const selectedPromotion = ref<number | ''>('');
+const selectedTool = ref<number | ''>('');
 const selectedFile = ref<File | null>(null);
 
 const isAnalyzing = ref(false);
@@ -151,7 +164,12 @@ const importResult = ref({ created: 0, updated: 0 });
 // --- CHARGEMENT. ---
 onMounted(async () => {
   try {
-    promotions.value = await api.getPromotions();
+    const [promoRes, toolRes] = await Promise.all([
+      api.getPromotions(),
+      api.getTools()
+    ]);
+    promotions.value = promoRes || [];
+    outils.value = toolRes || [];
   } catch (error) {
     console.error("Erreur chargement promotions:", error);
     ui.notify("Erreur lors du chargement des données.", "error");
@@ -194,6 +212,7 @@ const executeImport = async () => {
 
   const executePayload: ImportExecutePayload = {
     promotion_id: selectedPromotion.value as number,
+    tool_id: selectedTool.value as number,
     create_missing_groups: true,
     students: []
   };
@@ -236,6 +255,7 @@ const executeImport = async () => {
 
 const resetImport = () => {
   selectedFile.value = null;
+  selectedTool.value = '';
   previewData.value = null;
   importSuccess.value = false;
   const fileInput = document.querySelector('.file-input') as HTMLInputElement;

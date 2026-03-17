@@ -2,6 +2,7 @@ import uuid
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import joinedload
 from sqlmodel import Session, select
 
 from app.database import get_session
@@ -27,7 +28,10 @@ def _get_val(field):
 def get_students(session: Session = Depends(get_session)):
     """Récupère la liste de tous les étudiants avec leurs noms déchiffrés."""
 
-    students_db = session.exec(select(Student)).all()
+    statement = select(Student).options(
+        joinedload(Student.group), joinedload(Student.tool)
+    )
+    students_db = session.exec(statement).all()
 
     result = []
 
@@ -42,8 +46,10 @@ def get_students(session: Session = Depends(get_session)):
                 "last_name": nom_clair,
                 "promotion_id": s.promotion_id,
                 "group_id": s.group_id,
+                "tool_id": s.tool_id,
                 "promotion_name": s.promotion.name if s.promotion else None,
                 "group_name": s.group.name if s.group else None,
+                "tool_name": s.tool.name if s.tool else None,
                 "appetence_level": _get_val(s.appetence_level),
                 "has_library": _get_val(s.has_library),
                 "reading_support": _get_val(s.reading_support),
@@ -59,7 +65,12 @@ def get_students(session: Session = Depends(get_session)):
 
     return result
 
-@router.get("/with-scores", response_model=List[StudentWithScoresResponse], status_code=status.HTTP_200_OK)
+
+@router.get(
+    "/with-scores",
+    response_model=List[StudentWithScoresResponse],
+    status_code=status.HTTP_200_OK,
+)
 def get_students_with_scores(session: Session = Depends(get_session)):
     """Récupère la liste des étudiants avec leurs infos complètes ET leurs scores de dictées."""
 
@@ -89,6 +100,7 @@ def get_students_with_scores(session: Session = Depends(get_session)):
                 "group_id": s.group_id,
                 "promotion_name": s.promotion.name if s.promotion else None,
                 "group_name": s.group.name if s.group else None,
+                "tool_name": s.tool.name if s.tool else None,
                 "initial_score": score_initial,
                 "final_score": score_final,
             }
@@ -148,6 +160,7 @@ def get_students_progression(session: Session = Depends(get_session)):
                 "last_name": nom_clair,
                 "group_name": groupe_clair,
                 "group": groupe_clair,
+                "tool_name": s.tool.name if s.tool else None,
                 "score_initial": score_initial,
                 "score_final": score_final,
                 "progress": progress,
@@ -180,6 +193,7 @@ def get_student_by_id(student_uuid: uuid.UUID, session: Session = Depends(get_se
         "last_name": nom_clair,
         "promotion_id": student.promotion_id,
         "group_id": student.group_id,
+        "tool_id": student.tool_id,
         "promotion_name": student.promotion.name if student.promotion else None,
         "group_name": student.group.name if student.group else None,
         "appetence_level": _get_val(student.appetence_level),
@@ -208,6 +222,7 @@ def create_student(student_in: StudentCreate, session: Session = Depends(get_ses
         last_name_encrypted=nom_enc,
         promotion_id=student_in.promotion_id,
         group_id=student_in.group_id,
+        tool_id=student_in.tool_id,
         appetence_level=student_in.appetence_level,
         has_library=student_in.has_library,
         reading_support=student_in.reading_support,
@@ -230,6 +245,7 @@ def create_student(student_in: StudentCreate, session: Session = Depends(get_ses
         "last_name": student_in.last_name,
         "promotion_id": new_student.promotion_id,
         "group_id": new_student.group_id,
+        "tool_id": new_student.tool_id,
         "promotion_name": new_student.promotion.name if new_student.promotion else None,
         "group_name": new_student.group.name if new_student.group else None,
         "appetence_level": _get_val(new_student.appetence_level),
@@ -289,6 +305,7 @@ def update_student(
         "last_name": nom_clair,
         "promotion_id": db_student.promotion_id,
         "group_id": db_student.group_id,
+        "tool_id": db_student.tool_id,
         "promotion_name": db_student.promotion.name if db_student.promotion else None,
         "group_name": db_student.group.name if db_student.group else None,
         "appetence_level": _get_val(db_student.appetence_level),

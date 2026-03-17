@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 from sqlmodel import Session, select
 
 from app.models import Group, Student
+from app.models.entities import Tool
 from app.schemas.import_schema import (
     CsvRowData,
     ImportExecuteRequest,
@@ -18,6 +19,17 @@ from app.utils.import_utils import is_fuzzy_match, normalize_text, sort_semicolo
 class ImportService:
     def __init__(self, session: Session):
         self.session = session
+
+    def _get_or_create_default_tool(self) -> int:
+        """Récupère le premier outil disponible ou en crée un par défaut."""
+        tool = self.session.exec(select(Tool)).first()
+
+        if not tool:
+            tool = Tool(name="PV", full_name="Projet Voltaire")
+            self.session.add(tool)
+            self.session.flush()
+
+        return tool.id
 
     def _parse_csv(self, file_content: bytes) -> List[CsvRowData]:
         """Convertit le fichier CSV en liste d'objets Pydantic."""
@@ -144,10 +156,10 @@ class ImportService:
     def execute_import(self, request: ImportExecuteRequest) -> Dict[str, Any]:
         """Étape 3 : Exécute l'importation validée avec une transaction stricte."""
         try:
-            if request.create_missing_groups:
-                existing_groups = self.session.exec(select(Group)).all()
-                group_map = {normalize_text(g.name): g for g in existing_groups}
+            existing_groups = self.session.exec(select(Group)).all()
+            group_map = {normalize_text(g.name): g for g in existing_groups}
 
+            if request.create_missing_groups:
                 csv_group_names = set(
                     s.csv_data.group_name
                     for s in request.students
@@ -160,10 +172,6 @@ class ImportService:
                         self.session.flush()
                         group_map[normalize_text(g_name)] = new_group
 
-            else:
-                existing_groups = self.session.exec(select(Group)).all()
-                group_map = {normalize_text(g.name): g for g in existing_groups}
-
             created_count = 0
             updated_count = 0
 
@@ -173,12 +181,12 @@ class ImportService:
                 group_id = None
                 if csv_data.group_name:
                     group_obj = group_map.get(normalize_text(csv_data.group_name))
-                    if group_obj:
-                        group_id = group_obj.id
+                    group_id = group_obj.id if group_obj else None
 
                 student_data = {
                     "promotion_id": request.promotion_id,
                     "group_id": group_id,
+                    "tool_id": request.tool_id,
                     "first_name_encrypted": encrypt_text(csv_data.first_name.title()),
                     "last_name_encrypted": encrypt_text(csv_data.last_name.upper()),
                     "appetence_level": csv_data.appetence_level or None,

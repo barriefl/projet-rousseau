@@ -2,12 +2,8 @@ import pytest
 from fastapi import status
 from sqlmodel import select
 
-from app.models import AssessmentResult, Promotion, Student
-from app.schemas.assessment_schema import (
-    AssessmentExecuteRequest,
-    AssessmentType,
-    Platform,
-)
+from app.models import AssessmentResult, Promotion, Student, Tool
+from app.schemas.assessment_schema import AssessmentExecuteRequest, AssessmentType
 from app.services.assessment_import_service import AssessmentImportService
 from app.utils.crypto import encrypt_text
 
@@ -20,16 +16,23 @@ def setup_assessment_data(session):
     """Prépare l'environnement pour les évaluations."""
     promo = Promotion(name="Promo 2026")
     session.add(promo)
+
+    tool_pv = Tool(name="PV", full_name="Projet Voltaire")
+    tool_ecri = Tool(name="E+", full_name="Ecri+")
+    session.add(tool_pv)
+    session.add(tool_ecri)
     session.flush()
 
     student = Student(
         promotion_id=promo.id,
         first_name_encrypted=encrypt_text("Jean"),
         last_name_encrypted=encrypt_text("DUPONT"),
+        tool_id=tool_pv.id,
     )
     session.add(student)
     session.commit()
-    return promo, student
+
+    return promo, student, tool_pv, tool_ecri
 
 
 # ---------------------------------------------------------
@@ -38,7 +41,7 @@ def setup_assessment_data(session):
 def test_analyze_voltaire_initial(session, setup_assessment_data):
     """Vérifie l'extraction des données Voltaire Initial."""
     # ARRANGE.
-    promo, _ = setup_assessment_data
+    promo, _, tool_pv, _ = setup_assessment_data
     service = AssessmentImportService(session)
     csv_content = (
         "Nom;Prénom;Score évaluation initiale;Temps évaluation initiale\n"
@@ -47,7 +50,7 @@ def test_analyze_voltaire_initial(session, setup_assessment_data):
 
     # ACT.
     preview = service.analyze_file(
-        promo.id, Platform.VOLTAIRE, AssessmentType.INITIAL, csv_content
+        promo.id, tool_pv.id, AssessmentType.INITIAL, csv_content
     )
 
     # ASSERT.
@@ -59,7 +62,7 @@ def test_analyze_voltaire_initial(session, setup_assessment_data):
 def test_analyze_voltaire_final_with_blancs(session, setup_assessment_data):
     """Vérifie l'extraction Voltaire Final et les colonnes dynamiques 'blancs'."""
     # ARRANGE.
-    promo, _ = setup_assessment_data
+    promo, _, tool_pv, _ = setup_assessment_data
     service = AssessmentImportService(session)
     csv_content = (
         "Nom;Prénom;Score évaluation evaluation finale;Test blanc 1;Test blanc 2;Niveau atteint\n"
@@ -68,7 +71,7 @@ def test_analyze_voltaire_final_with_blancs(session, setup_assessment_data):
 
     # ACT.
     preview = service.analyze_file(
-        promo.id, Platform.VOLTAIRE, AssessmentType.FINAL, csv_content
+        promo.id, tool_pv.id, AssessmentType.FINAL, csv_content
     )
 
     # ASSERT.
@@ -83,7 +86,7 @@ def test_analyze_voltaire_final_with_blancs(session, setup_assessment_data):
 def test_analyze_ecriplus_success(session, setup_assessment_data):
     """Vérifie l'extraction des domaines de compétence Ecri+."""
     # ARRANGE.
-    promo, _ = setup_assessment_data
+    promo, _, _, tool_ecri = setup_assessment_data
     service = AssessmentImportService(session)
     csv_content = (
         "Nom d'usage;Prénom;% maîtrise de l'ensemble;orthographe grammaticale %;ses mots et ses expressions %\n"
@@ -92,7 +95,7 @@ def test_analyze_ecriplus_success(session, setup_assessment_data):
 
     # ACT.
     preview = service.analyze_file(
-        promo.id, Platform.ECRIPLUS, AssessmentType.INITIAL, csv_content
+        promo.id, tool_ecri.id, AssessmentType.INITIAL, csv_content
     )
 
     # ASSERT.
@@ -110,11 +113,11 @@ def test_analyze_file_errors(session):
 
     # ARRANGE & ACT & ASSERT.
     with pytest.raises(ValueError, match="CSV est vide"):
-        service.analyze_file(1, Platform.VOLTAIRE, AssessmentType.INITIAL, b"")
+        service.analyze_file(1, 1, AssessmentType.INITIAL, b"")
 
     with pytest.raises(ValueError, match="Impossible de trouver les colonnes"):
         service.analyze_file(
-            1, Platform.VOLTAIRE, AssessmentType.INITIAL, b"Mauvais;Header\nVal1;Val2"
+            1, 1, AssessmentType.INITIAL, b"Mauvais;Header\nVal1;Val2"
         )
 
 
@@ -124,11 +127,12 @@ def test_analyze_file_errors(session):
 def test_execute_assessment_import(session, setup_assessment_data):
     """Vérifie la création et la mise à jour en base."""
     # ARRANGE.
-    promo, student = setup_assessment_data
+    promo, student, tool_pv, _ = setup_assessment_data
     service = AssessmentImportService(session)
 
     request = AssessmentExecuteRequest(
-        platform=Platform.VOLTAIRE,
+        promotion_id=promo.id,
+        tool_id=tool_pv.id,
         assessment_type=AssessmentType.INITIAL,
         results=[{"student_id": student.id, "score": 0.5, "details": {}}],
     )
@@ -149,12 +153,13 @@ def test_execute_assessment_import(session, setup_assessment_data):
 def test_execute_assessment_rollback(session, setup_assessment_data, monkeypatch):
     """Vérifie le rollback en cas d'erreur DB."""
     # ARRANGE.
-    promo, student = setup_assessment_data
+    promo, student, tool_pv, _ = setup_assessment_data
     service = AssessmentImportService(session)
     monkeypatch.setattr(session, "commit", lambda: exec('raise Exception("DB Error")'))
 
     request = AssessmentExecuteRequest(
-        platform=Platform.VOLTAIRE,
+        promotion_id=promo.id,
+        tool_id=tool_pv.id,
         assessment_type=AssessmentType.INITIAL,
         results=[{"student_id": student.id, "score": 0.5, "details": {}}],
     )
@@ -194,7 +199,7 @@ def test_read_csv_encodings_and_edge_cases(session):
 def test_analyze_file_fuzzy_and_skipping(session, setup_assessment_data):
     """Couvre le fuzzy match et le saut de lignes vides."""
     # ARRANGE.
-    promo, student = setup_assessment_data
+    promo, student, tool_pv, _ = setup_assessment_data
     service = AssessmentImportService(session)
 
     csv_content = ("Nom;Prénom;Score évaluation initiale\n;;\nDUPONT;Jran;80").encode(
@@ -203,7 +208,7 @@ def test_analyze_file_fuzzy_and_skipping(session, setup_assessment_data):
 
     # ACT.
     preview = service.analyze_file(
-        promo.id, Platform.VOLTAIRE, AssessmentType.INITIAL, csv_content
+        promo.id, tool_pv.id, AssessmentType.INITIAL, csv_content
     )
 
     # ASSERT.
@@ -219,14 +224,14 @@ def test_analyze_file_empty_csv_error(session):
     # ACT & ASSERT.
     with pytest.raises(ValueError, match="Le fichier CSV est vide"):
         service.analyze_file(
-            1, Platform.VOLTAIRE, AssessmentType.INITIAL, b"Nom;Prenom\n"
+            1, 1, AssessmentType.INITIAL, b"Nom;Prenom\n"
         )
 
 
 def test_analyze_file_student_not_found(session, setup_assessment_data):
     """Couvre le cas où un étudiant du CSV n'a aucun match en base de données."""
     # ARRANGE.
-    promo, _ = setup_assessment_data
+    promo, _, tool_pv, _ = setup_assessment_data
     service = AssessmentImportService(session)
 
     csv_content = ("Nom;Prénom;Score évaluation initiale\nINCONNU;Xavier;50").encode(
@@ -235,7 +240,7 @@ def test_analyze_file_student_not_found(session, setup_assessment_data):
 
     # ACT.
     preview = service.analyze_file(
-        promo.id, Platform.VOLTAIRE, AssessmentType.INITIAL, csv_content
+        promo.id, tool_pv.id, AssessmentType.INITIAL, csv_content
     )
 
     # ASSERT.
@@ -251,7 +256,7 @@ def test_analyze_file_student_not_found(session, setup_assessment_data):
 def test_endpoint_assessment_preview_success(auth_client, setup_assessment_data):
     """Vérifie le succès de la preview via API."""
     # ARRANGE.
-    promo, _ = setup_assessment_data
+    promo, _, tool_pv, _ = setup_assessment_data
     csv_file = (
         "eval.csv",
         b"Nom;Prenom;Score evaluation initiale\nDUPONT;Jean;80",
@@ -263,7 +268,7 @@ def test_endpoint_assessment_preview_success(auth_client, setup_assessment_data)
         "/api/import/assessments/preview",
         data={
             "promotion_id": promo.id,
-            "platform": Platform.VOLTAIRE.value,
+            "tool_id": tool_pv.id,
             "assessment_type": AssessmentType.INITIAL.value,
         },
         files={"file": csv_file},
@@ -288,7 +293,7 @@ def test_endpoint_assessment_preview_invalid_format(auth_client):
         "/api/import/assessments/preview",
         data={
             "promotion_id": 1,
-            "platform": Platform.VOLTAIRE.value,
+            "tool_id": 1,
             "assessment_type": AssessmentType.INITIAL.value,
         },
         files={"file": ("test.txt", b"txt content", "text/plain")},
@@ -303,9 +308,10 @@ def test_endpoint_assessment_preview_invalid_format(auth_client):
 def test_endpoint_assessment_execute_success(auth_client, setup_assessment_data):
     """Vérifie l'exécution réussie via API."""
     # ARRANGE.
-    promo, student = setup_assessment_data
+    promo, student, tool_ecri, _ = setup_assessment_data
     payload = {
-        "platform": Platform.ECRIPLUS.value,
+        "promotion_id": promo.id,
+        "tool_id": tool_ecri.id,
         "assessment_type": AssessmentType.FINAL.value,
         "results": [{"student_id": student.id, "score": 0.85, "details": {}}],
     }
@@ -334,7 +340,8 @@ def test_endpoint_assessment_execute_error(auth_client, monkeypatch):
     )
 
     payload = {
-        "platform": Platform.VOLTAIRE.value,
+        "promotion_id": 1,
+        "tool_id": 1,
         "assessment_type": AssessmentType.INITIAL.value,
         "results": [],
     }
@@ -357,7 +364,7 @@ def test_endpoint_assessment_preview_value_error(auth_client, setup_assessment_d
     Couvre le bloc 'except Exception' de l'endpoint preview en provoquant un ValueError (colonnes manquantes).
     """
     # ARRANGE.
-    promo, _ = setup_assessment_data
+    promo, _, tool_pv, _ = setup_assessment_data
     bad_csv = ("test.csv", b"ColonneA;ColonneB\nValA;ValB", "text/csv")
 
     # ACT.
@@ -365,7 +372,7 @@ def test_endpoint_assessment_preview_value_error(auth_client, setup_assessment_d
         "/api/import/assessments/preview",
         data={
             "promotion_id": promo.id,
-            "platform": Platform.VOLTAIRE.value,
+            "tool_id": tool_pv.id,
             "assessment_type": AssessmentType.INITIAL.value,
         },
         files={"file": bad_csv},

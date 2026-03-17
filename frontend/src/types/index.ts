@@ -20,6 +20,23 @@ export interface PromotionUpdatePayload {
   name?: string
 }
 
+// --- TYPES POUR OUTILS. ---
+export interface Tool {
+  id: number
+  name: string
+  full_name: string
+}
+
+export interface ToolCreatePayload {
+  name: string
+  full_name: string
+}
+
+export interface ToolUpdatePayload {
+  name?: string
+  full_name?: string | null
+}
+
 // --- TYPES POUR GROUPES. ---
 export interface Group {
   id: number
@@ -37,8 +54,10 @@ export interface GroupUpdatePayload {
   description?: string | null
 }
 
+// --- TYPES POUR IMPORT DE CSV (ENQUÊTE). ---
 export interface ImportExecutePayload {
   promotion_id: number
+  tool_id: number
   create_missing_groups: boolean
   students: {
     csv_data: CsvRowData
@@ -47,7 +66,6 @@ export interface ImportExecutePayload {
   }[]
 }
 
-// --- TYPES POUR IMPORT DE CSV (ENQUÊTE). ---
 export interface CsvRowData {
   first_name: string
   last_name: string
@@ -95,7 +113,7 @@ export interface AssessmentMatchPreview {
 }
 
 export interface AssessmentPreviewResponse {
-  platform: Platform
+  tool_id: number
   assessment_type: AssessmentType
   matched_results: AssessmentMatchPreview[]
   unmatched_results: AssessmentMatchPreview[]
@@ -108,7 +126,8 @@ export interface AssessmentExecuteAction {
 }
 
 export interface AssessmentExecuteRequest {
-  platform: Platform
+  promotion_id: number
+  tool_id: number
   assessment_type: AssessmentType
   results: AssessmentExecuteAction[]
 }
@@ -123,6 +142,9 @@ export interface Student {
   group_id?: number | null
   promotion_name?: string | null
   group_name?: string | null
+  tool_id?: number | null
+  tool_name?: string | null
+  group_display?: string | null
 
   appetence_level?: string | null
   has_library?: string | null
@@ -145,6 +167,8 @@ export interface StudentWithScores {
   group_id?: number | null
   promotion_name?: string | null
   group_name?: string | null
+  tool_name?: string | null
+  group_display?: string | null
 
   initial_score: number | null
   final_score: number | null
@@ -190,6 +214,8 @@ export interface StudentProgression {
   first_name: string
   last_name: string
   group_name?: string | null
+  tool_name?: string | null
+  group_display?: string | null
   score_initial?: number | null
   score_final?: number | null
   progress?: number | null

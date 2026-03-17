@@ -10,7 +10,6 @@ from app.models.enums import (
     Degree,
     Library,
     MistakeType,
-    Platform,
     ReadingSupport,
 )
 
@@ -35,6 +34,16 @@ class Promotion(SQLModel, table=True):
     name: str = Field(unique=True, index=True, description="Ex: 2025 - 2026")
 
     students: List["Student"] = Relationship(back_populates="promotion")
+
+
+class Tool(SQLModel, table=True):
+    __tablename__ = "tools"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(unique=True, index=True)
+    full_name: str
+
+    students: List["Student"] = Relationship(back_populates="tool")
 
 
 class Group(SQLModel, table=True):
@@ -76,6 +85,9 @@ class Student(TimestampMixin, table=True):
 
     group_id: Optional[int] = Field(default=None, foreign_key="groups.id")
     group: Optional[Group] = Relationship(back_populates="students")
+
+    tool_id: Optional[int] = Field(foreign_key="tools.id")
+    tool: Optional[Tool] = Relationship(back_populates="students")
 
     appetence_level: Optional[str] = Field(
         default=None, description="Niveau d'appétence pour la lecture (note de 1 à 5)."
@@ -226,7 +238,7 @@ class AssessmentResult(TimestampMixin, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     student_id: int = Field(foreign_key="students.id")
 
-    platform: Platform
+    tool_id: int = Field(foreign_key="tools.id")
     assessment_type: AssessmentType
 
     score: float = Field(default=0.0)

@@ -1,6 +1,7 @@
 import pandas as pd
 from scipy import stats
 from sklearn.linear_model import LinearRegression
+from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from app.models import AssessmentResult, Dictation, Student, Submission
@@ -12,7 +13,11 @@ class StatsService:
         self.session = session
 
     def get_rousseau_dashboard_stats(self) -> dict:
-        students = self.session.exec(select(Student)).all()
+        students = self.session.exec(
+            select(Student).options(
+                selectinload(Student.promotion), selectinload(Student.group)
+            )
+        ).all()
         assessments = self.session.exec(select(AssessmentResult)).all()
 
         dictation = self.session.exec(select(Dictation)).first()
@@ -23,7 +28,7 @@ class StatsService:
 
         def to_precision(malus: float) -> float:
             return round(max(0.0, ((total_words - malus) / total_words) * 100), 2)
-        
+
         def get_ass_name(enum_obj):
             return enum_obj.name if hasattr(enum_obj, "name") else str(enum_obj).upper()
 
@@ -33,7 +38,7 @@ class StatsService:
         for student in students:
             for sub in student.submissions:
                 ass_name = get_ass_name(sub.assessment_type)
-                
+
                 if ass_name == "INITIAL" and sub.final_score is not None:
                     initial_scores[student.id] = to_precision(sub.final_score)
                 elif ass_name == "FINAL" and sub.final_score is not None:
@@ -374,8 +379,17 @@ class StatsService:
         }
 
     def get_emile_dashboard_stats(self) -> dict:
-        students = self.session.exec(select(Student)).all()
-        submissions = self.session.exec(select(Submission)).all()
+        students = self.session.exec(
+            select(Student).options(
+                selectinload(Student.promotion), selectinload(Student.group)
+            )
+        ).all()
+        submissions = self.session.exec(
+            select(Submission).options(
+                selectinload(Submission.student).selectinload(Student.promotion),
+                selectinload(Submission.student).selectinload(Student.group),
+            )
+        ).all()
 
         categories = self.session.exec(select(Category)).all()
         category_map = {c.id: c.name for c in categories}

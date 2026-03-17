@@ -3,13 +3,12 @@ from typing import Any, Dict, List, Tuple
 
 from sqlmodel import Session, select
 
-from app.models import AssessmentResult, Student
+from app.models import AssessmentResult, Student, Tool
 from app.schemas.assessment_schema import (
     AssessmentExecuteRequest,
     AssessmentMatchPreview,
     AssessmentPreviewResponse,
     AssessmentType,
-    Platform,
 )
 from app.utils.crypto import decrypt_text
 from app.utils.import_utils import (
@@ -169,7 +168,7 @@ class AssessmentImportService:
     def analyze_file(
         self,
         promotion_id: int,
-        platform: Platform,
+        tool_id: int,
         assessment_type: AssessmentType,
         file_content: bytes,
     ) -> AssessmentPreviewResponse:
@@ -217,7 +216,11 @@ class AssessmentImportService:
             norm_csv_first = normalize_text(csv_prenom)
             norm_csv_last = normalize_text(csv_nom)
 
-            if platform == Platform.VOLTAIRE:
+            tool = self.session.get(Tool, tool_id)
+            if not tool:
+                raise ValueError("L'outil sélectionné est introuvable.")
+
+            if tool.name == "PV":
                 score, details = self._extract_voltaire_data(
                     row, headers, assessment_type
                 )
@@ -269,7 +272,7 @@ class AssessmentImportService:
                 )
 
         return AssessmentPreviewResponse(
-            platform=platform,
+            tool_id=tool_id,
             assessment_type=assessment_type,
             matched_results=matched,
             unmatched_results=unmatched,
@@ -281,10 +284,15 @@ class AssessmentImportService:
 
         try:
             for item in request.results:
-                statement = select(AssessmentResult).where(
-                    AssessmentResult.student_id == item.student_id,
-                    AssessmentResult.platform == request.platform,
-                    AssessmentResult.assessment_type == request.assessment_type,
+                statement = (
+                    select(AssessmentResult)
+                    .join(Student) 
+                    .where(
+                        AssessmentResult.student_id == item.student_id,
+                        AssessmentResult.tool_id == request.tool_id,
+                        AssessmentResult.assessment_type == request.assessment_type,
+                        Student.promotion_id == request.promotion_id
+                    )
                 )
                 existing_result = self.session.exec(statement).first()
 
@@ -296,7 +304,7 @@ class AssessmentImportService:
                 else:
                     new_result = AssessmentResult(
                         student_id=item.student_id,
-                        platform=request.platform,
+                        tool_id=request.tool_id,
                         assessment_type=request.assessment_type,
                         score=item.score,
                         details=item.details,

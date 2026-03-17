@@ -86,6 +86,7 @@ def test_execute_import_create(session, setup_import_data):
 
     request = ImportExecuteRequest(
         promotion_id=promo.id,
+        tool_id=1,
         create_missing_groups=True,
         students=[
             {
@@ -119,6 +120,7 @@ def test_execute_import_update(session, setup_import_data):
 
     request = ImportExecuteRequest(
         promotion_id=promo.id,
+        tool_id=1,
         create_missing_groups=False,
         students=[
             {
@@ -158,6 +160,7 @@ def test_execute_import_rollback(session, setup_import_data, monkeypatch):
 
     request = ImportExecuteRequest(
         promotion_id=promo.id,
+        tool_id=1,
         students=[
             {
                 "action": "create",
@@ -222,7 +225,7 @@ def test_endpoint_execute_internal_error(auth_client, monkeypatch):
 
     # ACT.
     response = auth_client.post(
-        "/api/import/execute", json={"promotion_id": 1, "students": []}
+        "/api/import/execute", json={"promotion_id": 1, "tool_id": 1, "students": []}
     )
 
     # ASSERT.
@@ -272,6 +275,7 @@ def test_endpoint_execute_success(auth_client, setup_import_data):
 
     payload = {
         "promotion_id": promo.id,
+        "tool_id": 1,
         "create_missing_groups": True,
         "students": [
             {

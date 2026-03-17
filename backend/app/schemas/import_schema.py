@@ -52,5 +52,6 @@ class StudentExecuteAction(BaseModel):
 
 class ImportExecuteRequest(BaseModel):
     promotion_id: int
+    tool_id: int
     create_missing_groups: bool = True
     students: List[StudentExecuteAction]

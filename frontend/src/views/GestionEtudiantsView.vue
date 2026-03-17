@@ -10,6 +10,13 @@
         <GraduationCap :size="18" />
         <span>Promotions</span>
       </button>
+
+      <button class="btn tab-btn btn-with-icon" :class="{ active: activeTab === 'outils' }"
+        @click="activeTab = 'outils'">
+        <Wrench :size="18" />
+        <span>Outils</span>
+      </button>
+
       <button class="btn tab-btn btn-with-icon" :class="{ active: activeTab === 'groupes' }"
         @click="activeTab = 'groupes'">
         <Users :size="18" />
@@ -48,6 +55,49 @@
                   <span>Modifier</span>
                 </button>
                 <button class="btn btn-danger btn-sm btn-with-icon" @click="deleteItem('promo', promo)">
+                  <Trash2 :size="14" />
+                  <span>Supprimer</span>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div v-if="activeTab === 'outils'" class="tab-content">
+      <div class="content-header">
+        <h2>Liste des Outils</h2>
+        <button class="btn btn-primary btn-with-icon" @click="openModal('outil')">
+          <Plus :size="18" />
+          <span>Nouvel Outil</span>
+        </button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Nom complet</th>
+            <th style="text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="outils?.length === 0">
+            <td colspan="3">
+              <AppEmptyState title="Aucun outil" message="Ajoutez un outil pour commencer." />
+            </td>
+          </tr>
+          <tr v-for="outil in outils" :key="outil.id">
+            <td><strong>{{ outil.name }}</strong></td>
+            <td>{{ outil.full_name }}</td>
+            <td style="text-align: right;">
+              <div class="action-buttons">
+                <button class="btn btn-outline btn-sm btn-with-icon" @click="openModal('outil', outil)">
+                  <Pencil :size="14" />
+                  <span>Modifier</span>
+                </button>
+                <button class="btn btn-danger btn-sm btn-with-icon" @click="deleteItem('outil', outil)">
                   <Trash2 :size="14" />
                   <span>Supprimer</span>
                 </button>
@@ -104,23 +154,30 @@
     <div class="modal-overlay" v-if="showModal" @click.self="closeModal">
       <div class="modal">
         <h2 style="color: var(--primary); margin-bottom: 20px;">
-          {{ editingItem ? 'Modifier' : 'Ajouter' }} {{ modalType === 'promo' ? 'une promotion' : 'un groupe' }}
+          {{ editingItem ? 'Modifier' : 'Ajouter' }}
+          {{ modalType === 'promo' ? 'une promotion' : modalType === 'outil' ? 'un outil' : 'un groupe' }}
         </h2>
 
         <div class="form-group">
-          <label>Nom * :</label>
-          <input type="text" v-model="formName" :placeholder="modalType === 'promo' ? 'Ex: 2024-2025' : 'Ex: G1'"
-            @keyup.enter="saveItem">
+          <label>{{ modalType === 'outil' ? 'Code court *' : 'Nom *' }} :</label>
+          <input type="text" v-model="formName" :placeholder="getPlaceholder" @keyup.enter="saveItem">
         </div>
 
-        <div class="form-group" v-if="modalType === 'groupe'" style="margin-top: 15px;">
-          <label>Description :</label>
-          <textarea v-model="formDescription" placeholder="Ex: Jalons obligatoires..." rows="3"></textarea>
+        <div class="form-group" v-if="modalType === 'outil'" style="margin-top: 15px;">
+          <label>Nom complet * :</label>
+          <input type="text" v-model="formFullName" placeholder="Ex : Projet Voltaire">
         </div>
+
+        <template v-if="modalType === 'groupe'">
+          <div class="form-group" style="margin-top: 15px;">
+            <label>Description :</label>
+            <textarea v-model="formDescription" placeholder="Notes optionnelles..." rows="2"></textarea>
+          </div>
+        </template>
 
         <div class="modal-actions" style="margin-top: 25px;">
           <button class="btn btn-outline" @click="closeModal">Annuler</button>
-          <button class="btn btn-primary" @click="saveItem" :disabled="!formName.trim()">
+          <button class="btn btn-primary" @click="saveItem" :disabled="!isFormValid">
             Enregistrer
           </button>
         </div>
@@ -130,12 +187,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed, type Ref } from 'vue';
 import api from '@/services/api';
 
-import type { Promotion, Group } from '@/types';
+import type { Promotion, Tool, Group } from '@/types';
 
-import { GraduationCap, Users, Plus, Pencil, Trash2 } from 'lucide-vue-next';
+import { GraduationCap, Users, Plus, Pencil, Trash2, Wrench } from 'lucide-vue-next';
 
 import AppEmptyState from '@/components/common/AppEmptyState.vue';
 
@@ -143,19 +200,31 @@ import { useUiStore } from '@/stores/ui';
 
 const ui = useUiStore();
 
-const activeTab = ref<'promotions' | 'groupes'>('promotions');
+const activeTab = ref<'promotions' | 'outils' | 'groupes'>('promotions');
 
 const promotions = ref<Promotion[]>([]);
+const outils = ref<Tool[]>([]);
 const groupes = ref<Group[]>([]);
 
-// --- CHARGEMENT INITIAL. ---
+interface Identifiable {
+  id: number;
+}
+
+interface BaseItem {
+  id: number;
+  name: string;
+}
+
+// --- CHARGEMENT. ---
 onMounted(async () => {
   try {
-    const [promoRes, groupRes] = await Promise.all([
+    const [promoRes, toolRes, groupRes] = await Promise.all([
       api.getPromotions(),
+      api.getTools(),
       api.getGroups()
     ]);
     promotions.value = promoRes || [];
+    outils.value = toolRes || [];
     groupes.value = groupRes || [];
   } catch (error) {
     console.error("Erreur de chargement :", error);
@@ -165,20 +234,44 @@ onMounted(async () => {
 
 // --- GESTION DE LA MODALE. ---
 const showModal = ref(false);
-const modalType = ref<'promo' | 'groupe'>('promo');
+const modalType = ref<'promo' | 'outil' | 'groupe'>('promo');
 const editingItem = ref<Promotion | Group | null>(null);
+
 const formName = ref('');
+const formFullName = ref('');
 const formDescription = ref('');
 
-const openModal = (type: 'promo' | 'groupe', item: Promotion | Group | null = null) => {
+const isFormValid = computed(() => {
+  if (!formName.value.trim()) return false;
+  if (modalType.value === 'outil' && !formFullName.value.trim()) return false;
+  return true;
+});
+
+const getPlaceholder = computed(() => {
+  if (modalType.value === 'promo') return 'Ex : 2024 - 2025';
+  if (modalType.value === 'outil') return 'Ex : PV';
+  return 'Ex : G1';
+});
+
+const openModal = (type: 'promo' | 'outil' | 'groupe', item: Promotion | Tool | Group | null = null) => {
   modalType.value = type;
   editingItem.value = item;
   formName.value = item ? item.name : '';
 
-  if (item && type === 'groupe' && 'description' in item) {
-    formDescription.value = item.description || '';
-  } else {
-    formDescription.value = '';
+  formFullName.value = '';
+  formDescription.value = '';
+
+  if (!item) {
+    showModal.value = true;
+    return;
+  }
+
+  if (type === 'outil') {
+    const tool = item as Tool;
+    formFullName.value = tool.full_name || '';
+  } else if (type === 'groupe') {
+    const group = item as Group;
+    formDescription.value = group.description || '';
   }
 
   showModal.value = true;
@@ -188,72 +281,68 @@ const closeModal = () => {
   showModal.value = false;
   editingItem.value = null;
   formName.value = '';
+  formFullName.value = '';
   formDescription.value = '';
 };
 
 const saveItem = async () => {
-  if (!formName.value.trim()) return;
-
-  const isPromo = modalType.value === 'promo';
-  const label = isPromo ? 'Promotion' : 'Groupe';
+  if (!isFormValid.value) return;
 
   try {
-    if (editingItem.value) {
-      // MODE ÉDITION.
-      if (isPromo) {
-        const res = await api.updatePromotion(editingItem.value.id, { name: formName.value });
-        const index = promotions.value.findIndex(p => p.id === editingItem.value!.id);
-        if (index !== -1) promotions.value[index] = res as Promotion;
-      } else {
-        const res = await api.updateGroup(editingItem.value.id, {
-          name: formName.value,
-          description: formDescription.value || null
-        });
-        const index = groupes.value.findIndex(g => g.id === editingItem.value!.id);
-        if (index !== -1) groupes.value[index] = res as Group;
-      }
-      ui.notify(`${label} modifiée.`, "success");
+    let res;
+    const type = modalType.value;
 
-    } else {
-      // MODE CRÉATION.
-      if (isPromo) {
-        const res = await api.createPromotion({ name: formName.value });
-        promotions.value.push(res as Promotion);
-      } else {
-        const res = await api.createGroup({
-          name: formName.value,
-          description: formDescription.value || null
-        });
-        groupes.value.push(res as Group);
-      }
-      ui.notify(`${label} ajoutée.`, "success");
+    if (type === 'promo') {
+      res = editingItem.value
+        ? await api.updatePromotion(editingItem.value.id, { name: formName.value })
+        : await api.createPromotion({ name: formName.value });
+      updateLocalList(promotions, res);
+    }
+    else if (type === 'outil') {
+      const payload = { name: formName.value, full_name: formFullName.value };
+      res = editingItem.value
+        ? await api.updateTool(editingItem.value.id, payload)
+        : await api.createTool(payload);
+      updateLocalList(outils, res);
+    }
+    else if (type === 'groupe') {
+      const payload = {
+        name: formName.value,
+        description: formDescription.value
+      };
+
+      res = editingItem.value
+        ? await api.updateGroup(editingItem.value.id, payload)
+        : await api.createGroup(payload);
+
+      updateLocalList(groupes, res);
     }
 
+    ui.notify("Enregistrement réussi.", "success");
     closeModal();
-
   } catch (error: unknown) {
-    console.error(error);
+    console.error('Erreur : ', error);
     ui.notify("Erreur lors de l'enregistrement.", "error");
   }
 };
 
-const deleteItem = async (type: 'promo' | 'groupe', item: Promotion | Group) => {
-  const label = type === 'promo' ? 'cette promotion' : 'ce groupe';
-  const confirmed = await ui.askConfirm(`Êtes-vous sûr de vouloir supprimer ${label} ("${item.name}") ?`);
+const updateLocalList = <T extends Identifiable>(listRef: Ref<T[]>, item: T) => {
+  const index = listRef.value.findIndex((i) => i.id === item.id);
+  if (index !== -1) listRef.value[index] = item;
+  else listRef.value.push(item);
+};
 
-  if (confirmed) {
+const deleteItem = async (type: 'promo' | 'outil' | 'groupe', item: BaseItem) => {
+  if (await ui.askConfirm(`Supprimer "${item.name}" ?`)) {
     try {
-      if (type === 'promo') {
-        await api.deletePromotion(item.id);
-        promotions.value = promotions.value.filter(p => p.id !== item.id);
-      } else {
-        await api.deleteGroup(item.id);
-        groupes.value = groupes.value.filter(g => g.id !== item.id);
-      }
-      ui.notify("Suppression effectuée.", "success");
-    } catch (error: unknown) {
-      console.error(error);
-      ui.notify("Erreur lors de la suppression.", "error");
+      if (type === 'promo') await api.deletePromotion(item.id), promotions.value = promotions.value.filter(p => p.id !== item.id);
+      if (type === 'outil') await api.deleteTool(item.id), outils.value = outils.value.filter(o => o.id !== item.id);
+      if (type === 'groupe') await api.deleteGroup(item.id), groupes.value = groupes.value.filter(g => g.id !== item.id);
+      ui.notify("Supprimé.", "success");
+    }
+    catch (error: unknown) {
+      console.error('Erreur : ', error);
+      ui.notify("Erreur suppression.", "error");
     }
   }
 };
@@ -401,7 +490,7 @@ tr:hover {
 }
 
 /* ==========================================================================
-   FORMULAIRE DE MODIFICATION.
+   FORMULAIRE.
    ========================================================================== */
 .form-group input,
 .form-group textarea {
@@ -415,8 +504,17 @@ tr:hover {
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group select:focus {
   border-color: var(--accent);
   outline: none;
+}
+
+select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
 }
 </style>

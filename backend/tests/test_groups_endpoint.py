@@ -94,7 +94,7 @@ def test_create_group_duplicate(auth_client, setup_group):
 
     # ASSERT.
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.json()["detail"] == "Ce groupe existe déjà."
+    assert response.json()["detail"] == "Ce groupe existe déjà pour cet outil."
 
 # ---------------------------------------------------------
 # TEST MISE À JOUR (PATCH /{id}).

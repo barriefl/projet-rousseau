@@ -27,6 +27,9 @@ import type {
   StudentWithScores,
   EmileStatsResponse,
   AuthResponse,
+  Tool,
+  ToolCreatePayload,
+  ToolUpdatePayload,
 } from '@/types'
 import type { AssessmentType, Platform } from '@/types/generated_enums'
 import { useUiStore } from '@/stores/ui'
@@ -230,6 +233,128 @@ export default {
   },
 
   // ==========================================
+  // --- OUTILS ---
+  // ==========================================
+
+  /**
+   * Récupère la liste de tous les outils enregistrées dans le système.
+   * Cette méthode effectue une requête HTTP GET vers l'endpoint `/tools/`.
+   *
+   * @async
+   * @function getTools
+   * @returns {ApiData<Tool[]>} Une promesse contenant un tableau d'objets `Tool`.
+   * @throws {AxiosError} Propage une erreur provenant d'Axios si la requête échoue :
+   * - `401/403` : Erreur d'authentification ou de permissions.
+   * - `500` : Erreur interne du serveur.
+   * @example
+   * try {
+   *   isLoadingTools.value = true;
+   *   const tools = await api.getTools();
+   *   tools.value = tools;
+   * } catch (error) {
+   *   console.error("Erreur lors du chargement des outils :", error);
+   *   ui.notify("Impossible de charger les outils.", "error");
+   * } finally {
+   *   isLoadingTools.value = false;
+   * }
+   */
+  async getTools(): ApiData<Tool[]> {
+    const response = await apiClient.get<Tool[]>('/tools/')
+    return response.data
+  },
+
+  /**
+   * Récupère les détails d'un outil spécifique à partir de son identifiant.
+   * Cette méthode effectue une requête HTTP GET vers l'endpoint `/tools/{id}`.
+   *
+   * @async
+   * @function getToolById
+   * @param {number} toolId - L'identifiant numérique unique de l'outil (ex: 1).
+   * @returns {ApiData<Tool>} Une promesse contenant l'objet `Tool` demandé.
+   * @throws {AxiosError} Propage une erreur provenant d'Axios si la requête échoue :
+   * - `404` : L'outil spécifié n'existe pas.
+   * @example
+   * try {
+   *    const toolData = await api.getToolById(12);
+   *    currentTool.value = toolData;
+   * } catch (error) {
+   *    ui.notify("Outil introuvable.", "error");
+   * }
+   */
+  async getToolById(toolId: number): ApiData<Tool> {
+    const response = await apiClient.get<Tool>(`/tools/${toolId}`)
+    return response.data
+  },
+
+  /**
+   * Crée un nouvel outil dans la base de données.
+   * Cette méthode effectue une requête HTTP POST vers l'endpoint `/tools/`.
+   *
+   * @async
+   * @function createTool
+   * @param {ToolCreatePayload} data - Le payload contenant les données du nouvel outil.
+   * @returns {ApiData<Tool>} Une promesse contenant l'objet `Tool` nouvellement créé (avec son ID généré).
+   * @throws {AxiosError} Propage une erreur provenant d'Axios si la requête échoue :
+   * - `400` : Données invalides ou nom d'outil déjà existant.
+   * @example
+   * try {
+   *    const newTool = await api.createTool({ name: "PV" });
+   *    ui.notify(`L'outil ${newTool.name} a été créé.`, "success");
+   * } catch (error) {
+   *    ui.notify("Échec de la création de l'outil.", "error");
+   * }
+   */
+  async createTool(data: ToolCreatePayload): ApiData<Tool> {
+    const response = await apiClient.post<Tool>('/tools/', data)
+    return response.data
+  },
+
+  /**
+   * Modifie les informations d'un outil existant (comme son nom).
+   * Cette méthode effectue une requête HTTP PATCH vers l'endpoint `/tools/{id}`.
+   *
+   * @async
+   * @function updateTool
+   * @param {number} toolId - L'identifiant numérique de l'outil à modifier.
+   * @param {ToolUpdatePayload} data - Les données à mettre à jour.
+   * @returns {ApiData<Tool>} Une promesse contenant l'outil mise à jour.
+   * @throws {AxiosError} Propage une erreur si la requête échoue (400, 404, 500).
+   * @example
+   * try {
+   *    const updatedTool = await api.updateTool(5, { name: "E+ (Modifié)" });
+   *    ui.notify("Outil mis à jour.", "success");
+   * } catch (error) {
+   *    ui.notify("Impossible de modifier l'outil.", "error");
+   * }
+   */
+  async updateTool(toolId: number, data: ToolUpdatePayload): ApiData<Tool> {
+    const response = await apiClient.patch<Tool>(`/tools/${toolId}`, data)
+    return response.data
+  },
+
+  /**
+   * Supprime définitivement un outil de la base de données.
+   * Attention : Cette action peut être bloquée ou entraîner des suppressions en cascade selon les contraintes de clés étrangères.
+   *
+   * @async
+   * @function deleteTool
+   * @param {number} toolId - L'identifiant numérique de l'outil à supprimer.
+   * @returns {ApiData<void>} Une promesse vide se résolvant en cas de succès.
+   * @throws {AxiosError} Propage une erreur si la requête échoue (ex: 409 Conflict s'il y a des groupes liés).
+   * @example
+   * try {
+   *    await api.deleteTool(12);
+   *    ui.notify("Outil supprimé avec succès.", "success");
+   * } catch (error) {
+   *    ui.notify("Cet outil ne peut pas être supprimé car elle contient des données.", "error");
+   * }
+   */
+  async deleteTool(toolId: number): ApiData<void> {
+    const response = await apiClient.delete<void>(`/tools/${toolId}`)
+    return response.data
+  },
+
+  // ==========================================
   // --- GROUPES ---
   // ==========================================
 
@@ -426,13 +551,13 @@ export default {
    */
   async previewAssessmentImport(
     promotionId: number,
-    platform: Platform,
+    toolId: number,
     assessmentType: AssessmentType,
     file: File,
   ): ApiData<AssessmentPreviewResponse> {
     const formData = new FormData()
     formData.append('promotion_id', promotionId.toString())
-    formData.append('platform', platform)
+    formData.append('tool_id', toolId.toString())
     formData.append('assessment_type', assessmentType)
     formData.append('file', file)
 

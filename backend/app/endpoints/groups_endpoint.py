@@ -13,7 +13,7 @@ router = APIRouter(prefix="/groups", tags=["Groups"])
 @router.get("/", response_model=List[GroupResponse], status_code=status.HTTP_200_OK)
 def get_groups(session: Session = Depends(get_session)):
     """Récupère tous les groupes."""
-    return session.exec(select(Group).order_by(Group.name)).all()
+    return session.exec(select(Group)).all()
 
 
 @router.get("/{group_id}", response_model=GroupResponse, status_code=status.HTTP_200_OK)
@@ -31,9 +31,11 @@ def get_group_by_id(group_id: int, session: Session = Depends(get_session)):
 def create_group(group_in: GroupCreate, session: Session = Depends(get_session)):
     """Crée un nouveau groupe."""
     existing = session.exec(select(Group).where(Group.name == group_in.name)).first()
+
     if existing:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Ce groupe existe déjà."
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ce groupe existe déjà pour cet outil.",
         )
 
     new_group = Group(**group_in.model_dump())
@@ -57,6 +59,19 @@ def update_group(
         )
 
     update_data = group_in.model_dump(exclude_unset=True)
+
+    if "name" in update_data:
+        new_name = update_data["name"]
+        duplicate = session.exec(
+            select(Group).where(Group.name == new_name, Group.id != group_id)
+        ).first()
+
+        if duplicate:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Un groupe avec ce nom existe déjà.",
+            )
+
     for key, value in update_data.items():
         setattr(group, key, value)
 

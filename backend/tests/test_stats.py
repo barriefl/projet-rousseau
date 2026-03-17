@@ -14,8 +14,9 @@ from app.models.entities import (
     Promotion,
     Student,
     Submission,
+    Tool,
 )
-from app.models.enums import CSP, AssessmentType, Degree, MistakeType, Platform
+from app.models.enums import CSP, AssessmentType, Degree, MistakeType
 
 
 # ---------------------------------------------------------
@@ -224,6 +225,10 @@ def test_stats_with_populated_db(auth_client, session: Session):
 
     groups = {name: Group(name=name) for name in ["G1", "G2", "G3", "G4", "G5"]}
 
+    tool_v = Tool(name="PV", full_name="Voltaire")
+    session.add(tool_v)
+    session.commit()
+
     cat_grammaire = Category(lt_category_id="CAT_GRAMMAIRE", name="Grammaire")
     dictation = Dictation(
         title="Dictée Test",
@@ -289,7 +294,7 @@ def test_stats_with_populated_db(auth_client, session: Session):
                 student_id=student.id,
                 assessment_type=AssessmentType.INITIAL,
                 score=score_initial,
-                platform=Platform.VOLTAIRE,
+                tool_id=tool_v.id,
             )
         )
         session.add(
@@ -297,7 +302,7 @@ def test_stats_with_populated_db(auth_client, session: Session):
                 student_id=student.id,
                 assessment_type=AssessmentType.FINAL,
                 score=score_final,
-                platform=Platform.VOLTAIRE,
+                tool_id=tool_v.id,
             )
         )
 

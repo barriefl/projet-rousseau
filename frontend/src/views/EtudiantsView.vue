@@ -25,7 +25,7 @@
             <strong>{{ student.last_name }} {{ student.first_name }}</strong>
           </td>
           <td>{{ student.promotion_name || 'Non renseignée' }}</td>
-          <td>{{ student.group_name || 'Non assigné' }}</td>
+          <td>{{ student.group_display || 'Non assigné' }}</td>
           <td style="text-align: right">
             <div class="action-buttons">
               <button class="btn btn-primary btn-sm" @click="openEditModal(student)">
@@ -51,7 +51,7 @@
   </div>
 
   <div class="page-container">
-    <StudentFormModal :show="showEditModal" :student-data="selectedStudent" :promotions="promotions" :groups="groups"
+    <StudentFormModal :show="showEditModal" :student-data="selectedStudent" :promotions="promotions" :groups="groups" :tools="tools"
       :is-edit="true" @close="showEditModal = false" @save="handleUpdate" />
   </div>
 </template>
@@ -60,7 +60,7 @@
 import { ref, onMounted } from 'vue'
 import api from '@/services/api'
 
-import type { Student, Promotion, Group, StudentUpdatePayload } from '@/types'
+import type { Student, Promotion, Group, StudentUpdatePayload, Tool } from '@/types'
 
 import AppLoading from '@/components/common/AppLoading.vue';
 import AppEmptyState from '@/components/common/AppEmptyState.vue';
@@ -75,6 +75,7 @@ const ui = useUiStore();
 const students = ref<Student[]>([])
 const promotions = ref<Promotion[]>([])
 const groups = ref<Group[]>([])
+const tools = ref<Tool[]>([])
 const loading = ref(true)
 
 const loadData = async () => {
@@ -93,17 +94,19 @@ const selectedStudent = ref<Student | null>(null);
 
 onMounted(async () => {
   try {
-    const [studentsRes, promoRes, groupsRes] = await Promise.all([
+    const [studentsRes, promoRes, groupsRes, toolsRes] = await Promise.all([
       api.getStudents(),
       api.getPromotions(),
       api.getGroups(),
+      api.getTools(),
     ])
 
-    const studentData = studentsRes as Student[]
+    students.value = studentsRes as Student[]
     promotions.value = promoRes as Promotion[]
     groups.value = groupsRes as Group[]
+    tools.value = toolsRes as Tool[]
 
-    const sortedStudents = studentData.sort((a, b) => {
+    const sortedStudents = students.value.sort((a, b) => {
       const compareNom = a.last_name.localeCompare(b.last_name, 'fr')
       if (compareNom === 0) {
         return a.first_name.localeCompare(b.first_name, 'fr')

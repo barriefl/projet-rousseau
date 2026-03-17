@@ -16,6 +16,7 @@ from app.endpoints import (
     stats_endpoint,
     students_endpoint,
     submissions_endpoint,
+    tools_endpoint,
 )
 from app.utils.auth import verify_token
 
@@ -62,6 +63,9 @@ def health_check():
 app.include_router(auth_endpoint.router, prefix="/api")
 app.include_router(
     promotions_endpoint.router, prefix="/api", dependencies=[Depends(verify_token)]
+)
+app.include_router(
+    tools_endpoint.router, prefix="/api", dependencies=[Depends(verify_token)]
 )
 app.include_router(
     groups_endpoint.router, prefix="/api", dependencies=[Depends(verify_token)]

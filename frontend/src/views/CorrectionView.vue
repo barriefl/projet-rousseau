@@ -21,7 +21,7 @@
         <div class="student-info">
           <h4 style="color: var(--primary); margin: 0 0 5px 0;">{{ student.last_name }} {{ student.first_name }}</h4>
           <p style="margin: 0 0 10px 0; color: #555; font-size: 0.9rem;">
-            ({{ student.promotion_name || 'Sans promo' }}) ({{ student.group_name || 'Sans groupe' }})
+            ({{ student.promotion_name || 'Sans promo' }}) ({{ student.group_display || 'Sans groupe' }})
           </p>
         </div>
 
