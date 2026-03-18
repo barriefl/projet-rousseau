@@ -1,4 +1,17 @@
 services:
+  docker-cleaner:
+    image: docker:latest
+    container_name: rousseau_cleaner
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      sh -c "while true; do
+                sleep 86400;
+                docker system prune -f --volumes;
+              done"
+    restart: unless-stopped
+    networks:
+      - rousseau_net
   db:
     image: postgres:15-alpine
     container_name: rousseau_db
@@ -29,7 +42,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 768M
 
   pgadmin:
     image: dpage/pgadmin4
@@ -60,7 +73,7 @@ services:
     ports:
       - "8010:8081"
     environment:
-      - Java_Xms=256m
+      - Java_Xms=128m
       - Java_Xmx=512m
       - JAVA_TOOL_OPTIONS=-Djava.net.preferIPv4Stack=true
     volumes:
@@ -72,13 +85,17 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 600M
     
   backend:
     build:
       context: ./backend
     container_name: rousseau_backend
     restart: unless-stopped
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
     volumes:
       - ./backend:/app
       - ./data:/data
@@ -105,8 +122,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 512M
+          cpus: '0.8'
+          memory: 768M
 
   frontend:
     build:
@@ -124,6 +141,10 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
 volumes:
   postgres_data:
