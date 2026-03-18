@@ -202,21 +202,6 @@ Le projet inclut des tests unitaires et de bout en bout (E2E) pour le frontend.
 
 ## Diagramme de classe
 
-Voici ton diagramme de classe complet.
-
-Pour éviter les bugs d'affichage ("spaghetti" de flèches ou erreurs de syntaxe dans VS Code/GitHub), j'ai appliqué les règles suivantes :
-
-Tous les champs sont explicitement listés dans les classes (y compris les dates du TimestampMixin et les clés étrangères comme group_id). Cela m'a permis de retirer les flèches d'héritage qui rendent le diagramme illisible.
-
-J'ai converti les types complexes Python (Dict, uuid.UUID) en types standards lisibles (JSON, UUID).
-
-Les liaisons sont simples (-->) et déclarées dans un ordre logique (de la configuration vers les résultats) pour aider le moteur de rendu à organiser les blocs proprement de gauche à droite (direction LR).
-
-Copie-colle exactement le bloc ci-dessous dans ton README.md (sans espace avant les backticks) :
-
-Markdown
-## Diagramme de classe
-
 ```mermaid
 classDiagram
     direction LR
