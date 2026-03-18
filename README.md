@@ -17,6 +17,7 @@
 - [Scripts Utilitaires](#scripts-utilitaires-backend)
 - [Structure du Projet](#structure-du-projet)
 - [Tests](#tests)
+- [Diagramme de classe](#diagramme-de-classe)
 
 ## Contexte
 
@@ -47,20 +48,21 @@ Avant de lancer le projet, vous devez créer un fichier `.env` à la racine du p
 Vous pouvez vous baser sur un hypothétique fichier `.env.example` :
 
 ```env
-# Base de données PostgreSQL
+# Base de données PostgreSQL.
 POSTGRES_USER=admin
 POSTGRES_PASSWORD=secretpassword
 POSTGRES_DB=rousseau_db
 
-# pgAdmin
+# pgAdmin.
 PGADMIN_EMAIL=admin@rousseau.com
 PGADMIN_PASSWORD=admin
-
-SECRET_KEY=secretkey
-
 DATABASE_URL=postgresql://admin:secretpassword@localhost:5434/rousseau_db
 
-# Sécurité Backend
+# Session.
+SECRET_KEY=CodeSecret
+ADMIN_PASSWORD=TaCleJWT
+
+# Sécurité Backend (AES).
 # Générer avec python : "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ENCRYPTION_KEY=VotreCleFernetIci
 ```
@@ -181,8 +183,180 @@ projet-rousseau/
 
 ## Tests
 
+### Backend
+
+Le projet inclut des tests d'intégrations pour le backend.
+
+1. Se placer dans le dossier backend : `cd backend`
+2. Activer l'environnement virtuel : `.\venv\Scripts\Activate`
+3. Lancer les tests d'intégrations (Pytest) : `pytest -vv -s`
+4. Générer le rapport de code coverage (HTML) : `pytest --cov=app --cov-report=html`
+
+### Frontend
+
 Le projet inclut des tests unitaires et de bout en bout (E2E) pour le frontend.
 
 1. Se placer dans le dossier frontend : `cd frontend`
 2. Lancer les tests unitaires (Vitest) : `npm run test:unit`
 3. Lancer les tests E2E (Playwright) : `npm run test:e2e`
+
+## Diagramme de classe
+
+Voici ton diagramme de classe complet.
+
+Pour éviter les bugs d'affichage ("spaghetti" de flèches ou erreurs de syntaxe dans VS Code/GitHub), j'ai appliqué les règles suivantes :
+
+Tous les champs sont explicitement listés dans les classes (y compris les dates du TimestampMixin et les clés étrangères comme group_id). Cela m'a permis de retirer les flèches d'héritage qui rendent le diagramme illisible.
+
+J'ai converti les types complexes Python (Dict, uuid.UUID) en types standards lisibles (JSON, UUID).
+
+Les liaisons sont simples (-->) et déclarées dans un ordre logique (de la configuration vers les résultats) pour aider le moteur de rendu à organiser les blocs proprement de gauche à droite (direction LR).
+
+Copie-colle exactement le bloc ci-dessous dans ton README.md (sans espace avant les backticks) :
+
+Markdown
+## Diagramme de classe
+
+```mermaid
+classDiagram
+    direction LR
+
+    %% ==========================================
+    %% BLOC 1 : STRUCTURE ET CONFIGURATION
+    %% ==========================================
+    class Promotion {
+        +int id
+        +string name
+    }
+
+    class Group {
+        +int id
+        +string name
+        +string description
+    }
+
+    class Tool {
+        +int id
+        +string name
+        +string full_name
+    }
+
+    class Dictation {
+        +int id
+        +string title
+        +string content_reference
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    class Category {
+        +int id
+        +string lt_category_id
+        +string name
+        +MistakeType type_rousseau
+        +float penalty
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    %% ==========================================
+    %% BLOC 2 : NOYAU (ÉLÈVE)
+    %% ==========================================
+    class Student {
+        +int id
+        +UUID anonymous_id
+        +string first_name_encrypted
+        +string last_name_encrypted
+        +int promotion_id
+        +int group_id
+        +int tool_id
+        +string appetence_level
+        +Library has_library
+        +ReadingSupport reading_support
+        +string reading_works
+        +string motive
+        +Degree parent_1_degree
+        +CSP parent_1_csp
+        +Degree parent_2_degree
+        +CSP parent_2_csp
+        +string declared_level
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    %% ==========================================
+    %% BLOC 3 : ÉVALUATIONS ET RÉSULTATS
+    %% ==========================================
+    class AssessmentResult {
+        +int id
+        +int student_id
+        +int tool_id
+        +AssessmentType assessment_type
+        +float score
+        +JSON details
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    class Submission {
+        +int id
+        +int student_id
+        +int dictation_id
+        +AssessmentType assessment_type
+        +string content_student
+        +float final_score
+        +JSON scores
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    %% ==========================================
+    %% BLOC 4 : CORRECTION ET LOGIQUE
+    %% ==========================================
+    class Rule {
+        +int id
+        +string lt_rule_id
+        +string description
+        +bool is_active
+        +int category_id
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    class Mistake {
+        +int id
+        +int submission_id
+        +int category_id
+        +string student_word
+        +string correct_word
+        +int position_index
+        +int length
+        +MistakeType type_rousseau
+        +float malus_applied
+        +string rule_id_lt
+        +string message
+        +string context
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    %% ==========================================
+    %% RELATIONS
+    %% ==========================================
+    
+    %% Arrivées sur l'étudiant
+    Promotion "1" --> "*" Student
+    Group "1" --> "*" Student
+    Tool "1" --> "*" Student
+
+    %% Départs de l'étudiant (Résultats & Copies)
+    Student "1" --> "*" AssessmentResult
+    Tool "1" --> "*" AssessmentResult
+    Student "1" --> "*" Submission
+    Dictation "1" --> "*" Submission
+
+    %% Logique de correction
+    Category "1" --> "*" Rule
+    Submission "1" --> "*" Mistake
+    Category "1" --> "*" Mistake
+```
