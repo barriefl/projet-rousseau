@@ -1,10 +1,11 @@
-name: Backend Tests (Pytest)
+name: Backend Tests & Manual Deploy
 
 on:
   push:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -33,3 +34,19 @@ jobs:
         run: |
           cd backend
           pytest --cov=app --cov-report=xml
+
+  deploy:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Production via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/emmanuellegraziano/rousseau
+            git pull origin main
+            docker compose up -d --build
