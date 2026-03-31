@@ -74,7 +74,6 @@ jobs:
       - name: Deploy Backend
         run: |
           cd /home/rousseau/projet_rousseau
-          
           git pull origin main
           
           cd backend
@@ -83,4 +82,4 @@ jobs:
           
           pkill -f "uvicorn app.main:app" || true
           sleep 2
-          nohup uvicorn app.main:app --host 0.0.0.0 --port 8080 > api.log 2>&1 &
+          RUNNER_TRACKING_ID="" nohup uvicorn app.main:app --host 0.0.0.0 --port 8080 > api.log 2>&1 &
