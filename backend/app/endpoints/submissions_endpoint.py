@@ -93,21 +93,7 @@ def create_bulk_submissions(
     submissions_in: List[SubmissionCreate], session: Session = Depends(get_session)
 ):
     """Importe plusieurs copies d'un coup pour éviter de saturer le serveur."""
-    lt_host_docker = "languagetool"
-    lt_host_windows = "host.docker.internal"
-    lt_url = "http://127.0.0.1:8010/v2/check"
-
-    try:
-        socket.gethostbyname(lt_host_docker)
-        lt_url = f"http://{lt_host_docker}:8081/v2/check"
-    except socket.gaierror:
-        try:
-            socket.gethostbyname(lt_host_windows)
-            lt_url = f"http://{lt_host_windows}:8010/v2/check"
-        except socket.gaierror:
-            pass
-
-    correction_service = CorrectionService(session, lt_url=lt_url)
+    correction_service = CorrectionService(session)
 
     student_uuids = [sub.student_uuid for sub in submissions_in]
     students_db = session.exec(

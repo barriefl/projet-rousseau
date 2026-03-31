@@ -1,4 +1,4 @@
-name: Backend Tests & Manual Deploy
+name: Build, Test & Manual Deploy
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -35,18 +35,52 @@ jobs:
           cd backend
           pytest --cov=app --cov-report=xml
 
-  deploy:
-    needs: test
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to Production via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd /home/emmanuellegraziano/rousseau
-            git pull origin main
-            docker compose up -d --build
+          node-version: '20'
+
+      - name: Build Frontend
+        env:
+          VITE_API_URL: http://10.103.1.201:8080/api
+        run: |
+          cd frontend
+          npm install
+          npm run build
+
+      - name: Upload Frontend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+  deploy:
+    needs: build-and-test
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+    steps:
+      - name: Download Frontend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
+      - name: Deploy Frontend
+        run: |
+          # Supprime l'ancien site et copie le nouveau, directement via le terminal.
+          rm -rf /var/www/html/rousseau/*
+          cp -r dist/* /var/www/html/rousseau/
+
+      - name: Deploy Backend
+        run: |
+          cd /home/rousseau/projet_rousseau
+          
+          git pull origin main
+          
+          cd backend
+          source venv/bin/activate
+          pip install -r requirements.txt
+          
+          pkill -f "uvicorn app.main:app" || true
+          sleep 2
+          nohup uvicorn app.main:app --host 0.0.0.0 --port 8080 > api.log 2>&1 &

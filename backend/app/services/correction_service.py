@@ -1,4 +1,5 @@
 import difflib
+import os
 import re
 from typing import Any, Dict, List, Tuple
 
@@ -10,7 +11,7 @@ from app.models import Category, Dictation, Mistake, MistakeType, Rule, Submissi
 
 
 class CorrectionService:
-    DEFAULT_LT_URL = "http://languagetool:8010/v2/check"
+    DEFAULT_LT_URL = os.getenv("LANGUAGETOOL_URL", "http://localhost:8010/v2/check")
 
     def __init__(self, session: Session, lt_url: str = None):
         self.session = session
