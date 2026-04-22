@@ -44,6 +44,36 @@ def setup_sub_data(session):
     return student, dictation
 
 
+@pytest.fixture
+def setup_multi_students(session):
+    """Prépare plusieurs étudiants pour les tests d'importation JSON."""
+    promo = Promotion(name="P_JSON")
+    group = Group(name="G_JSON")
+    session.add(promo)
+    session.add(group)
+    session.flush()
+
+    students = []
+    for i in range(10):
+        s = Student(
+            anonymous_id=uuid.uuid4(),
+            first_name_encrypted=b"enc",
+            last_name_encrypted=b"enc",
+            promotion_id=promo.id,
+            group_id=group.id,
+        )
+        session.add(s)
+        students.append(s)
+
+    dictation = Dictation(
+        title="Dictée JSON test",
+        content_reference="Texte de référence pour le test JSON.",
+    )
+    session.add(dictation)
+    session.commit()
+    return students, dictation
+
+
 # ---------------------------------------------------------
 # TEST CRÉATION (POST /).
 # ---------------------------------------------------------
@@ -280,6 +310,153 @@ def test_create_bulk_submissions_new_and_correction_error(
         assert response.status_code == status.HTTP_201_CREATED
         assert mock_sub.html_text is None
         assert response.json()[0]["content_student"] == "Update"
+
+
+def test_create_bulk_submissions_multiple_students(
+    auth_client, setup_multi_students, session
+):
+    """
+    Simule l'importation bulk typique d'un JSON multi-étudiants.
+    Vérifie que plusieurs soumissions sont créées pour des étudiants différents
+    et que chacune est indépendante.
+    """
+    # ARRANGE.
+    students, dictation = setup_multi_students
+
+    payload = [
+        {
+            "student_uuid": str(s.anonymous_id),
+            "dictation_id": dictation.id,
+            "assessment_type": AssessmentType.INITIAL.value,
+            "content_student": f"Texte de l'étudiant {i}",
+        }
+        for i, s in enumerate(students)
+    ]
+
+    with (
+        patch(
+            "app.endpoints.submissions_endpoint.socket.gethostbyname",
+            side_effect=socket.gaierror,
+        ),
+        patch("app.endpoints.submissions_endpoint.CorrectionService") as MockService,
+    ):
+        MockService.return_value.correct_submission.return_value = None
+
+        # ACT.
+        response = auth_client.post("/api/submissions/bulk", json=payload)
+
+        # ASSERT.
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert len(data) == len(students)
+        contents = [d["content_student"] for d in data]
+        for i in range(len(students)):
+            assert f"Texte de l'étudiant {i}" in contents
+
+
+def test_create_bulk_submissions_empty_payload(auth_client, setup_sub_data):
+    """Un payload vide doit retourner une liste vide sans erreur."""
+    # ARRANGE.
+    with (
+        patch(
+            "app.endpoints.submissions_endpoint.socket.gethostbyname",
+            side_effect=socket.gaierror,
+        ),
+        patch("app.endpoints.submissions_endpoint.CorrectionService"),
+    ):
+        # ACT.
+        response = auth_client.post("/api/submissions/bulk", json=[])
+
+        # ASSERT.
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.json() == []
+
+
+def test_create_bulk_submissions_overwrite_existing(
+    auth_client, setup_sub_data, session
+):
+    """
+    Vérifie que la soumission existante est écrasée lors d'une réimportation
+    (cas typique : réimportation d'un JSON après correction d'une faute de saisie).
+    """
+    # ARRANGE.
+    student, dictation = setup_sub_data
+
+    existing = Submission(
+        student_id=student.id,
+        dictation_id=dictation.id,
+        assessment_type=AssessmentType.INITIAL.value,
+        content_student="Ancien contenu",
+        scores={"Grammaire": 2.0},
+        final_score=2.0,
+    )
+    session.add(existing)
+    session.commit()
+
+    payload = [
+        {
+            "student_uuid": str(student.anonymous_id),
+            "dictation_id": dictation.id,
+            "assessment_type": AssessmentType.INITIAL.value,
+            "content_student": "Contenu corrigé après réimportation JSON",
+        }
+    ]
+
+    with (
+        patch(
+            "app.endpoints.submissions_endpoint.socket.gethostbyname",
+            side_effect=socket.gaierror,
+        ),
+        patch("app.endpoints.submissions_endpoint.CorrectionService") as MockService,
+    ):
+        MockService.return_value.correct_submission.return_value = None
+
+        # ACT.
+        response = auth_client.post("/api/submissions/bulk", json=payload)
+
+        # ASSERT.
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["content_student"] == "Contenu corrigé après réimportation JSON"
+
+
+def test_create_bulk_submissions_chunk_processing(
+    auth_client, setup_multi_students, session
+):
+    """
+    Vérifie que des gros volumes (> 5 éléments, taille d'un chunk) sont bien
+    traités intégralement. Simule le comportement côté backend lors d'un
+    import JSON contenant de nombreuses entrées.
+    """
+    # ARRANGE.
+    students, dictation = setup_multi_students
+
+    payload = [
+        {
+            "student_uuid": str(s.anonymous_id),
+            "dictation_id": dictation.id,
+            "assessment_type": AssessmentType.FINAL.value,
+            "content_student": f"Réponse finale étudiant {i}",
+        }
+        for i, s in enumerate(students)
+    ]
+
+    with (
+        patch(
+            "app.endpoints.submissions_endpoint.socket.gethostbyname",
+            side_effect=socket.gaierror,
+        ),
+        patch("app.endpoints.submissions_endpoint.CorrectionService") as MockService,
+    ):
+        MockService.return_value.correct_submission.return_value = None
+
+        # ACT.
+        response = auth_client.post("/api/submissions/bulk", json=payload)
+
+        # ASSERT.
+        assert response.status_code == status.HTTP_201_CREATED
+        assert len(response.json()) == len(students)
 
 
 # ---------------------------------------------------------
