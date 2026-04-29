@@ -80,6 +80,4 @@ jobs:
           source venv/bin/activate
           pip install -r requirements.txt
           
-          pkill -f "uvicorn app.main:app" || true
-          sleep 2
-          RUNNER_TRACKING_ID="" nohup uvicorn app.main:app --host 0.0.0.0 --port 8080 > api.log 2>&1 &
+          sudo systemctl restart rousseau-backend
