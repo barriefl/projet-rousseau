@@ -632,11 +632,11 @@ class StatsService:
                 },
             },
             "comparison_human_robot": {
-                "Correction Humaine (G4)": {
+                "Remédiation Humaine (G4)": {
                     "Initial": safe_avg(hr_i_human),
                     "Final": safe_avg(hr_f_human),
                 },
-                "Correction IA/Outil (G2, G3, G5)": {
+                "Remédiation IA/Outil (G2, G3, G5)": {
                     "Initial": safe_avg(hr_i_robot),
                     "Final": safe_avg(hr_f_robot),
                 },

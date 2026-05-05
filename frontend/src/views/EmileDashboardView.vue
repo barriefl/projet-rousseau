@@ -87,7 +87,7 @@
         </div>
       </div>
 
-      <h2 class="section-title">Outils & Corrections</h2>
+      <h2 class="section-title">Outils & Remédiations</h2>
       <div class="grid-2">
         <div class="card chart-container compare-card">
           <h3>Voltaire vs Écri+</h3>
