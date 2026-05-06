@@ -151,14 +151,14 @@ def test_get_emile_stats_empty_db(auth_client):
             "Écri+ (G5)": {"Initial": 0.0, "Final": 0.0},
         },
         "comparison_human_robot": {
-            "Correction Humaine (G4)": {"Initial": 0.0, "Final": 0.0},
-            "Correction IA/Outil (G2, G3, G5)": {"Initial": 0.0, "Final": 0.0},
+            "Remédiation Humaine (G4)": {"Initial": 0.0, "Final": 0.0},
+            "Remédiation IA/Outil (G2, G3, G5)": {"Initial": 0.0, "Final": 0.0},
         },
         "comparison_motivation": {
             "Autonomie (G1)": 0.0,
             "Jalons obligatoires (G2)": 0.0,
             "Salle (G3)": 0.0,
-            "Correction Humaine (G4)": 0.0,
+            "Remédiation Humaine (G4)": 0.0,
         },
         "mistakes_stats": {"global": {}, "promotions": {}},
     }

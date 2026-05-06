@@ -645,7 +645,7 @@ class StatsService:
                 "Autonomie (G1)": calc_progress(mot_i_g1, mot_f_g1),
                 "Jalons obligatoires (G2)": calc_progress(mot_i_g2, mot_f_g2),
                 "Salle (G3)": calc_progress(mot_i_g3, mot_f_g3),
-                "Correction Humaine (G4)": calc_progress(mot_i_g4, mot_f_g4),
+                "Remédiation Humaine (G4)": calc_progress(mot_i_g4, mot_f_g4),
             },
             "mistakes_stats": mistakes_stats,
         }
